@@ -1,0 +1,50 @@
+models:
+  qwen:
+    name: "通义千问"
+    enabled: false
+    model_id: "qwen-max"                          # 非联网对话用的模型
+    search_model_id: "qwen3.6-plus"               # 联网搜索用的模型（Responses API要求）
+    endpoint: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    supports_search: true
+    search_api: "responses"                        # 联网走Responses API
+    concurrency: 5
+    request_interval: 0.2
+
+  deepseek:
+    name: "DeepSeek"
+    enabled: true
+    model_id: "deepseek-chat"
+    endpoint: "https://api.deepseek.com/v1"
+    supports_search: false                         # 标准API不支持联网
+    search_api: "chat_completions"
+    concurrency: 5
+    request_interval: 0.2
+
+  hunyuan:
+    name: "腾讯混元"
+    enabled: false
+    model_id: "hunyuan-turbos-latest"
+    endpoint: "https://api.hunyuan.cloud.tencent.com/v1"
+    supports_search: true
+    search_api: "chat_completions"                 # 混元联网走Chat Completions + extra_body
+    search_param: "enable_enhancement"             # 混元用enable_enhancement开启搜索增强
+    concurrency: 5
+    request_interval: 0.2
+
+  doubao:
+    name: "豆包"
+    enabled: true
+    model_id: "doubao-seed-2-0-pro-260215"         # 非联网对话
+    search_model_id: "doubao-seed-2-0-pro-260215"  # 联网搜索（同模型，走Responses API）
+    endpoint: "https://ark.cn-beijing.volces.com/api/v3"
+    supports_search: true
+    search_api: "responses"                        # 联网走Responses API
+    concurrency: 10
+    request_interval: 0.1
+
+query_settings:
+  rounds: 5
+  temperature: 0.7
+  max_tokens: 2048
+  retry_max: 3
+  retry_delay: 5

@@ -1,0 +1,18 @@
+使用流程
+
+  # 1. 复制并填写API key
+  cp config/api_keys.yaml.example config/api_keys.yaml
+  # 编辑填入key
+
+  # 2. 问题已解析（40题）
+  # questions/questions_base.json 已生成
+
+  # 3. 生成问题变体（需要OpenAI key）
+  python scripts/02_expand_questions.py
+
+  # 4. 在models.yaml中启用已到位的模型（enabled: true）
+  # 批量调用（支持断点续跑）
+  python scripts/03_query_models.py
+
+  # 5. 生成分析报表
+  python scripts/04_analyze_results.py

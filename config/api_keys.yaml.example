@@ -1,0 +1,14 @@
+openai:
+  api_key: "sk-xxx"
+
+qwen:
+  api_key: "sk-xxx"
+
+deepseek:
+  api_key: "sk-xxx"
+
+hunyuan:
+  api_key: "sk-xxx"
+
+doubao:
+  api_key: "sk-xxx"

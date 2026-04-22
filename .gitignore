@@ -1,0 +1,10 @@
+config/api_keys.yaml
+results/raw/
+results/execution_log.json
+results/analysis/
+__pycache__/
+*.pyc
+~$*
+.env
+.idea/
+.venv/
