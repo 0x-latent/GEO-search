@@ -1,0 +1,143 @@
+# 999品牌产品词典（产品名 → 别名列表）
+# 匹配时按名称长度降序，优先匹配更长的名称
+brand_999:
+  999感冒灵:
+    aliases: ["三九感冒灵", "999感冒灵颗粒", "感冒灵颗粒"]
+    short_name: "感冒灵"
+    category: "感冒药"
+  999皮炎平:
+    aliases: ["三九皮炎平", "皮炎平软膏", "复方醋酸地塞米松乳膏"]
+    short_name: "皮炎平"
+    category: "皮肤药"
+  养胃舒:
+    aliases: ["养胃舒颗粒", "养胃舒胶囊"]
+    category: "胃药"
+  三九胃泰:
+    aliases: ["三九胃泰颗粒", "999胃泰"]
+    category: "胃药"
+  999抗病毒口服液:
+    aliases: ["三九抗病毒口服液", "抗病毒口服液", "999抗病毒"]
+    category: "抗病毒"
+  999小儿氨酚黄那敏:
+    aliases: ["小儿氨酚黄那敏颗粒"]
+    short_name: "小儿氨酚黄那敏"
+    category: "儿童感冒药"
+  强力枇杷露:
+    aliases: ["999强力枇杷露", "三九强力枇杷露"]
+    category: "止咳药"
+  澳诺葡萄糖酸锌钙:
+    aliases: ["澳诺钙", "葡萄糖酸锌钙口服溶液"]
+    short_name: "澳诺"
+    category: "补钙补锌"
+  易善复:
+    aliases: ["多烯磷脂酰胆碱胶囊", "易善复胶囊"]
+    category: "护肝药"
+
+# 竞品词典（按品类组织）
+competitors:
+  # ===== 感冒药 =====
+  连花清瘟: { aliases: ["连花清瘟胶囊", "连花清瘟颗粒"], category: "感冒药" }
+  板蓝根: { aliases: ["板蓝根颗粒"], category: "感冒药" }
+  白加黑: { aliases: ["白加黑感冒片"], category: "感冒药" }
+  泰诺: { aliases: ["泰诺感冒片"], category: "感冒药" }
+  新康泰克: { aliases: ["新康泰克胶囊"], category: "感冒药" }
+  快克: { aliases: ["快克感冒胶囊"], category: "感冒药" }
+  感康: { aliases: ["感康片", "复方氨酚烷胺片"], category: "感冒药" }
+  仁和可立克: { aliases: ["可立克"], category: "感冒药" }
+  吴太感康: { aliases: [], category: "感冒药" }
+  感冒清热颗粒: { aliases: [], category: "感冒药" }
+  银翘解毒片: { aliases: [], category: "感冒药" }
+  荆防颗粒: { aliases: [], category: "感冒药" }
+  酚麻美敏片: { aliases: [], category: "感冒药" }
+  氨酚伪麻美芬片: { aliases: [], category: "感冒药" }
+
+  # ===== 皮肤药 =====
+  派瑞松: { aliases: ["曲安奈德益康唑乳膏"], category: "皮肤药" }
+  艾洛松: { aliases: ["糠酸莫米松乳膏"], category: "皮肤药" }
+  丹皮酚软膏: { aliases: [], category: "皮肤药" }
+  无极膏: { aliases: [], category: "皮肤药" }
+  冰黄肤乐软膏: { aliases: [], category: "皮肤药" }
+  吡美莫司乳膏: { aliases: [], category: "皮肤药" }
+  他克莫司软膏: { aliases: [], category: "皮肤药" }
+  地奈德乳膏: { aliases: [], category: "皮肤药" }
+  氢化可的松乳膏: { aliases: [], category: "皮肤药" }
+  丁酸氢化可的松乳膏: { aliases: [], category: "皮肤药" }
+  炉甘石洗剂: { aliases: [], category: "皮肤药" }
+  夫西地酸乳膏: { aliases: [], category: "皮肤药" }
+  莫匹罗星软膏: { aliases: [], category: "皮肤药" }
+  氧化锌软膏: { aliases: [], category: "皮肤药" }
+  卤米松乳膏: { aliases: [], category: "皮肤药" }
+
+  # ===== 胃药 =====
+  达喜: { aliases: ["铝碳酸镁咀嚼片", "铝碳酸镁片"], category: "胃药" }
+  吗丁啉: { aliases: ["多潘立酮片"], category: "胃药" }
+  奥美拉唑: { aliases: ["奥美拉唑肠溶胶囊"], category: "胃药" }
+  斯达舒: { aliases: [], category: "胃药" }
+  气滞胃痛颗粒: { aliases: [], category: "胃药" }
+  摩罗丹: { aliases: [], category: "胃药" }
+  胃苏颗粒: { aliases: [], category: "胃药" }
+  香砂养胃丸: { aliases: [], category: "胃药" }
+  香砂六君丸: { aliases: [], category: "胃药" }
+  保和丸: { aliases: [], category: "胃药" }
+  健胃消食片: { aliases: [], category: "胃药" }
+  参苓白术散: { aliases: [], category: "胃药" }
+  莫沙必利: { aliases: [], category: "胃药" }
+  米曲菌胰酶片: { aliases: [], category: "胃药" }
+
+  # ===== 止咳药 =====
+  川贝枇杷膏: { aliases: ["京都念慈菴川贝枇杷膏", "念慈菴"], category: "止咳药" }
+  急支糖浆: { aliases: [], category: "止咳药" }
+  复方甘草片: { aliases: [], category: "止咳药" }
+  肺力咳合剂: { aliases: [], category: "止咳药" }
+  蜜炼川贝枇杷膏: { aliases: [], category: "止咳药" }
+  右美沙芬: { aliases: ["氢溴酸右美沙芬片"], category: "止咳药" }
+  盐酸氨溴索: { aliases: [], category: "止咳药" }
+  乙酰半胱氨酸: { aliases: [], category: "止咳药" }
+  羧甲司坦: { aliases: [], category: "止咳药" }
+  桉柠蒎肠溶软胶囊: { aliases: [], category: "止咳药" }
+  复方甲氧那明胶囊: { aliases: [], category: "止咳药" }
+  通宣理肺丸: { aliases: [], category: "止咳药" }
+  养阴清肺丸: { aliases: [], category: "止咳药" }
+
+  # ===== 咽喉药 =====
+  西瓜霜含片: { aliases: ["西瓜霜润喉片"], category: "咽喉药" }
+  草珊瑚含片: { aliases: ["复方草珊瑚含片"], category: "咽喉药" }
+  西地碘含片: { aliases: [], category: "咽喉药" }
+  银黄含片: { aliases: [], category: "咽喉药" }
+  西吡氯铵含片: { aliases: [], category: "咽喉药" }
+
+  # ===== 抗过敏药 =====
+  氯雷他定: { aliases: ["氯雷他定片", "氯雷他定糖浆"], category: "抗过敏药" }
+  西替利嗪: { aliases: ["西替利嗪滴剂"], category: "抗过敏药" }
+
+  # ===== 补钙/补锌 =====
+  迪巧: { aliases: ["迪巧儿童钙"], category: "补钙补锌" }
+  钙尔奇: { aliases: [], category: "补钙补锌" }
+  龙牡壮骨颗粒: { aliases: [], category: "补钙补锌" }
+  三精葡萄糖酸锌: { aliases: ["三精补锌"], category: "补钙补锌" }
+  蓝瓶钙: { aliases: ["三精蓝瓶钙"], category: "补钙补锌" }
+  碳酸钙D3颗粒: { aliases: [], category: "补钙补锌" }
+
+  # ===== 护肝药 =====
+  护肝片: { aliases: ["葵花护肝片"], category: "护肝药" }
+  水飞蓟宾: { aliases: ["水飞蓟宾胶囊"], category: "护肝药" }
+  双环醇: { aliases: ["双环醇片"], category: "护肝药" }
+  甘草酸二铵: { aliases: ["甘草酸制剂"], category: "护肝药" }
+  利加隆: { aliases: [], category: "护肝药" }
+  天晴甘美: { aliases: [], category: "护肝药" }
+
+  # ===== 儿童感冒药 =====
+  小儿豉翘清热颗粒: { aliases: [], category: "儿童感冒药" }
+  小儿感冒颗粒: { aliases: [], category: "儿童感冒药" }
+  美林: { aliases: ["布洛芬混悬液"], category: "儿童感冒药" }
+  泰诺林: { aliases: ["对乙酰氨基酚混悬滴剂"], category: "儿童感冒药" }
+  对乙酰氨基酚片: { aliases: [], category: "儿童感冒药" }
+
+  # ===== 抗病毒 =====
+  奥司他韦: { aliases: ["磷酸奥司他韦"], category: "抗病毒" }
+  蒲地蓝消炎口服液: { aliases: ["蒲地蓝"], category: "抗病毒" }
+  双黄连口服液: { aliases: ["双黄连"], category: "抗病毒" }
+  清开灵: { aliases: ["清开灵颗粒"], category: "抗病毒" }
+  蓝芩口服液: { aliases: [], category: "抗病毒" }
+  玛巴洛沙韦: { aliases: [], category: "抗病毒" }
+  扎那米韦: { aliases: [], category: "抗病毒" }

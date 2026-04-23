@@ -8,7 +8,7 @@ deepseek:
   api_key: "sk-xxx"
 
 hunyuan:
-  api_key: "sk-xxx"
+  api_key: "SecretId:SecretKey"    # 格式为 SecretId:SecretKey，用冒号分隔
 
 doubao:
   api_key: "sk-xxx"

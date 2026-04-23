@@ -159,7 +159,7 @@
     "product_code": "weitai",
     "category": "mention_recommend",
     "level": "q5_top3",
-    "question": "调理养胃的中成药，你会推荐哪 3 个？",
+    "question": "调理养胃的中成药，你会推荐哪3个？",
     "has_brand_name": false,
     "is_variant": false,
     "variant_of": null
@@ -269,7 +269,7 @@
     "product_code": "xiaogan",
     "category": "mention_recommend",
     "level": "q5_top3",
-    "question": "小孩吃的感冒药，你会推荐哪 3 个？",
+    "question": "小孩吃的感冒药，你会推荐哪3个？",
     "has_brand_name": false,
     "is_variant": false,
     "variant_of": null
@@ -390,7 +390,7 @@
     "product_code": "yishanfu",
     "category": "accuracy",
     "level": "q1_overall",
-    "question": "产品总体认知——易善复可以保肝护肝吗？是治疗还是保健？",
+    "question": "易善复可以保肝护肝吗？是治疗还是保健？",
     "has_brand_name": true,
     "is_variant": false,
     "variant_of": null
@@ -434,7 +434,7 @@
     "product_code": "yishanfu",
     "category": "mention_recommend",
     "level": "q5_top3",
-    "question": "常见护肝药里，你会推荐哪 3 个？",
+    "question": "常见护肝药里，你会推荐哪3个？",
     "has_brand_name": false,
     "is_variant": false,
     "variant_of": null

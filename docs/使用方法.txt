@@ -14,5 +14,33 @@
   # 批量调用（支持断点续跑）
   python scripts/03_query_models.py
 
+  # 4.1 重跑单个问题（所有已启用模型）
+  python scripts/03_query_models.py --rerun yishanfu_q1_overall
+  # 4.2 重跑多个问题
+  python scripts/03_query_models.py --rerun yishanfu_q1_overall ganmaolin_q2_detail
+  # 4.3 只重跑指定模型
+  python scripts/03_query_models.py --rerun yishanfu_q1_overall --models deepseek qwen
+
   # 5. 生成分析报表
   python scripts/04_analyze_results.py
+
+  # 5.1 llm提出推荐产品
+  python scripts/08_extract_recommendations.py
+
+  # 6. 提取品牌知识库（只做增量）
+  python scripts/06_build_knowledge_base.py
+
+  # 6.1 强制全部重跑
+  python scripts/06_build_knowledge_base.py --force
+
+  # 7. 跑keyword校对（免费）
+  python scripts/07_verify_accuracy.py --mode keyword
+
+  # 7.1 跑LLM校对（花钱，自动读取04预计算的相似度来决定发2条还是5条）
+  python scripts/07_verify_accuracy.py --mode llm
+
+  # 7.3 或者keyword+llm一起
+  python scripts/07_verify_accuracy.py --mode both
+
+  # 8. AI分析解读
+  python scripts/05_generate_report.py

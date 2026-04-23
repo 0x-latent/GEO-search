@@ -1,0 +1,4002 @@
+{
+  "小感": {
+    "product_name": "小感",
+    "facts": [
+      {
+        "category": "basic_info",
+        "fact": "本品通用名称为小儿氨酚黄那敏颗粒，常用名称为999小儿氨酚黄那敏颗粒。",
+        "keywords": [
+          "小儿氨酚黄那敏颗粒",
+          "999",
+          "通用名称",
+          "常用名称"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "本品是抗生素",
+          "本品是成人感冒药"
+        ]
+      },
+      {
+        "category": "basic_info",
+        "fact": "本品英文名称为Pediatric Paracetamol, Artificial Cow-bezoar and Chlorphenamine Maleate Granules。",
+        "keywords": [
+          "英文名称",
+          "Pediatric Paracetamol",
+          "Artificial Cow-bezoar",
+          "Chlorphenamine Maleate Granules"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": []
+      },
+      {
+        "category": "efficacy",
+        "fact": "999小儿氨酚黄那敏颗粒适用于缓解儿童普通感冒及流行性感冒引起的发热、头痛、鼻塞、流涕、打喷嚏等症状。",
+        "keywords": [
+          "儿童感冒",
+          "流感",
+          "发热",
+          "头痛",
+          "鼻塞",
+          "流涕",
+          "打喷嚏",
+          "适应症"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "本品可以治疗所有感染性疾病",
+          "本品只适用于普通感冒不适用于流感",
+          "本品主要治疗咳嗽和咽痛"
+        ]
+      },
+      {
+        "category": "efficacy",
+        "fact": "本品属于儿童感冒对症治疗药，用于缓解症状，不是针对病因的抗感染药物。",
+        "keywords": [
+          "对症治疗",
+          "缓解症状",
+          "不是抗感染药",
+          "不是抗生素"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "本品能杀灭细菌或病毒",
+          "本品可以替代抗感染治疗",
+          "本品是消炎药"
+        ]
+      },
+      {
+        "category": "ingredients",
+        "fact": "每袋本品含对乙酰氨基酚125毫克、马来酸氯苯那敏0.5毫克、人工牛黄5毫克。",
+        "keywords": [
+          "成分",
+          "每袋含量",
+          "对乙酰氨基酚",
+          "马来酸氯苯那敏",
+          "人工牛黄"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "本品不含对乙酰氨基酚",
+          "本品主要成分是布洛芬",
+          "本品不含抗过敏成分"
+        ]
+      },
+      {
+        "category": "mechanism",
+        "fact": "本品中的对乙酰氨基酚主要用于退热和缓解头痛、身体疼痛等不适。",
+        "keywords": [
+          "对乙酰氨基酚",
+          "退热",
+          "止痛",
+          "头痛",
+          "身体疼痛"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "对乙酰氨基酚主要用于止咳",
+          "对乙酰氨基酚没有退热作用"
+        ]
+      },
+      {
+        "category": "mechanism",
+        "fact": "本品中的马来酸氯苯那敏主要用于抗过敏，缓解流涕和打喷嚏等症状。",
+        "keywords": [
+          "马来酸氯苯那敏",
+          "黄那敏",
+          "抗过敏",
+          "流涕",
+          "打喷嚏"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "黄那敏是抗生素",
+          "黄那敏主要用于退烧",
+          "黄那敏对流涕打喷嚏没有作用"
+        ]
+      },
+      {
+        "category": "mechanism",
+        "fact": "本品中的人工牛黄主要用于辅助缓解感冒相关不适。",
+        "keywords": [
+          "人工牛黄",
+          "辅助缓解",
+          "感冒不适"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": [
+          "人工牛黄是本品唯一有效成分",
+          "人工牛黄等同于抗病毒药"
+        ]
+      },
+      {
+        "category": "applicable_scene",
+        "fact": "本品适用于儿童感冒时的对症缓解，小孩感冒时可以使用，但应按说明书要求根据年龄和体重合理用药。",
+        "keywords": [
+          "儿童",
+          "小孩感冒",
+          "可以吃",
+          "年龄",
+          "体重",
+          "合理用药"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "小孩感冒绝对不能吃本品",
+          "所有儿童都可以随意按成人剂量服用"
+        ]
+      },
+      {
+        "category": "usage",
+        "fact": "本品用法为温开水冲服。",
+        "keywords": [
+          "用法",
+          "温开水冲服",
+          "颗粒剂"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "本品需要咀嚼服用",
+          "本品必须空腹吞服胶囊"
+        ]
+      },
+      {
+        "category": "usage",
+        "fact": "本品一般按年龄或体重给药，实际用量应以说明书或医生指导为准，不可自行加量。",
+        "keywords": [
+          "用量",
+          "按年龄",
+          "按体重",
+          "说明书",
+          "医生指导",
+          "不可加量"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "本品剂量固定与年龄体重无关",
+          "孩子发烧越高就可以自行加量",
+          "本品可以随意增加服用频次"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "对对乙酰氨基酚过敏者禁用本品。",
+        "keywords": [
+          "禁用",
+          "对乙酰氨基酚过敏",
+          "过敏"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "对乙酰氨基酚过敏也可以继续使用本品"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "对马来酸氯苯那敏过敏者禁用本品。",
+        "keywords": [
+          "禁用",
+          "马来酸氯苯那敏过敏",
+          "黄那敏过敏"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "对黄那敏过敏不影响使用本品"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "对本品任一成分过敏者禁用本品。",
+        "keywords": [
+          "禁用",
+          "任一成分过敏",
+          "成分过敏"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "只要不是全部成分过敏就能用",
+          "轻微过敏史与本品无关"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "严重肝肾功能不全者应慎用本品或遵医嘱使用。",
+        "keywords": [
+          "慎用",
+          "肝功能不全",
+          "肾功能不全",
+          "遵医嘱"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "肝肾功能异常儿童可以随意使用本品",
+          "本品对肝肾功能没有任何要求"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "正在服用其他含对乙酰氨基酚感冒药的儿童不宜重复使用本品，以免对乙酰氨基酚过量。",
+        "keywords": [
+          "重复用药",
+          "对乙酰氨基酚",
+          "同服",
+          "过量",
+          "同类感冒药"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "本品可以和其他含对乙酰氨基酚药物一起吃",
+          "多种感冒药叠加退热更快更安全"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "婴幼儿及有特殊基础疾病的儿童应谨慎使用本品，必要时在医生指导下使用。",
+        "keywords": [
+          "婴幼儿",
+          "基础疾病",
+          "谨慎使用",
+          "医生指导"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "婴幼儿使用本品不需要任何额外注意",
+          "有基础疾病的儿童也可自行长期使用"
+        ]
+      },
+      {
+        "category": "applicable_scene",
+        "fact": "儿童发烧39℃时，本品可在符合说明书剂量条件下用于退热，但必须规范使用。",
+        "keywords": [
+          "39℃",
+          "发烧",
+          "退热",
+          "说明书剂量",
+          "规范使用"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "39℃绝对不能用本品",
+          "39℃时可以随意加大本品剂量"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "儿童发烧39℃使用本品时，不能叠加其他含对乙酰氨基酚的药物。",
+        "keywords": [
+          "39℃",
+          "对乙酰氨基酚",
+          "不能叠加",
+          "重复用药"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "高热时可以同时吃多个含对乙酰氨基酚药物"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "如孩子有肝功能异常、长期用药史或基础疾病，使用本品前建议先咨询医生。",
+        "keywords": [
+          "肝功能异常",
+          "长期用药史",
+          "基础疾病",
+          "咨询医生"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "有长期用药史也不需要咨询医生",
+          "基础疾病儿童用本品无需评估"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "连续用药后症状无改善或症状加重时，应及时就医。",
+        "keywords": [
+          "症状无改善",
+          "症状加重",
+          "及时就医"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "症状不缓解时继续自行长期服用即可",
+          "症状加重也不需要就医"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "如果高热持续不退，或伴有精神差、抽搐、呼吸异常、反复呕吐等情况，应尽快就医。",
+        "keywords": [
+          "高热不退",
+          "精神差",
+          "抽搐",
+          "呼吸异常",
+          "反复呕吐",
+          "尽快就医"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "出现抽搐或呼吸异常时继续在家观察即可",
+          "高热不退只靠本品就够了"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "发热明显升高、持续不退，或孩子精神差、食欲极差时，不应只依赖自行用药。",
+        "keywords": [
+          "发热升高",
+          "持续不退",
+          "精神差",
+          "食欲极差",
+          "不要只依赖自行用药"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "孩子精神差时只要继续吃感冒药就行",
+          "持续高热无需就医"
+        ]
+      },
+      {
+        "category": "differentiation",
+        "fact": "本品与抗感染药不同，其定位是儿童感冒症状缓解药，而不是治疗病因的药物。",
+        "keywords": [
+          "区别",
+          "抗感染药",
+          "对症药",
+          "症状缓解"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "本品和抗生素作用一样",
+          "本品能直接治疗感冒病因"
+        ]
+      },
+      {
+        "category": "differentiation",
+        "fact": "本品属于复方儿童感冒药，兼顾退热止痛与缓解流涕、打喷嚏等症状。",
+        "keywords": [
+          "复方感冒药",
+          "退热",
+          "止痛",
+          "流涕",
+          "打喷嚏",
+          "产品特点"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "本品只有单一退烧作用",
+          "本品只能抗过敏不能退热"
+        ]
+      }
+    ],
+    "fact_count": 25
+  },
+  "强枇": {
+    "product_name": "强枇",
+    "facts": [
+      {
+        "category": "basic_info",
+        "fact": "本品通用名称为强力枇杷露，常用名称为999强力枇杷露。",
+        "keywords": [
+          "强力枇杷露",
+          "999强力枇杷露",
+          "通用名称",
+          "常用名称"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "本品名称是枇杷膏",
+          "本品不是999强力枇杷露"
+        ]
+      },
+      {
+        "category": "efficacy",
+        "fact": "强力枇杷露的说明书功能主治为养阴敛肺、止咳祛痰，用于支气管炎咳嗽。",
+        "keywords": [
+          "养阴敛肺",
+          "止咳祛痰",
+          "支气管炎咳嗽",
+          "功能主治"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "本品主要用于退烧",
+          "本品用于治疗所有类型感冒",
+          "本品不用于支气管炎咳嗽"
+        ]
+      },
+      {
+        "category": "applicable_scene",
+        "fact": "强力枇杷露更适合支气管炎相关的干咳、少痰咳嗽，以及咽干、肺燥倾向的咳嗽场景。",
+        "keywords": [
+          "干咳",
+          "少痰咳嗽",
+          "支气管炎相关咳嗽",
+          "咽干",
+          "肺燥"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "本品更适合痰多咳嗽",
+          "本品专治黄痰稠痰",
+          "只要咳嗽都适合用本品"
+        ]
+      },
+      {
+        "category": "differentiation",
+        "fact": "强力枇杷露虽有祛痰作用，但整体更偏养阴敛肺和止咳，典型优势场景是干咳或少痰咳嗽，而不是痰很多、痰黄稠厚、咳痰明显的情况。",
+        "keywords": [
+          "更适合干咳",
+          "少痰",
+          "不适合痰多",
+          "痰黄稠厚",
+          "产品区分"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "强力枇杷露最适合痰黄稠厚咳嗽",
+          "强力枇杷露是化痰为主的药",
+          "强力枇杷露对痰多咳嗽最有优势"
+        ]
+      },
+      {
+        "category": "mechanism",
+        "fact": "强力枇杷露的产品特点是以止咳为主，同时兼顾祛痰，并偏养阴敛肺方向。",
+        "keywords": [
+          "止咳为主",
+          "兼顾祛痰",
+          "养阴敛肺",
+          "产品特点"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "本品只有祛痰作用没有止咳作用",
+          "本品主要是清热解毒药",
+          "本品完全不祛痰"
+        ]
+      },
+      {
+        "category": "ingredients",
+        "fact": "强力枇杷露的主要成分包括枇杷叶、罂粟壳、百部、桑白皮、桔梗和薄荷脑。",
+        "keywords": [
+          "成分",
+          "枇杷叶",
+          "罂粟壳",
+          "百部",
+          "桑白皮",
+          "桔梗",
+          "薄荷脑"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "本品不含罂粟壳",
+          "本品主要成分是川贝",
+          "本品不含薄荷脑"
+        ]
+      },
+      {
+        "category": "ingredients",
+        "fact": "强力枇杷露辅料包括单糖浆、蔗糖、枸橼酸、香精和纯化水。",
+        "keywords": [
+          "辅料",
+          "单糖浆",
+          "蔗糖",
+          "枸橼酸",
+          "香精",
+          "纯化水"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "本品不含糖",
+          "本品无蔗糖相关辅料"
+        ]
+      },
+      {
+        "category": "usage",
+        "fact": "强力枇杷露为口服制剂，推荐用法用量为一次15毫升，一日3次。",
+        "keywords": [
+          "口服",
+          "一次15毫升",
+          "一日3次",
+          "用法用量"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "本品一次5毫升",
+          "本品一天只需服1次",
+          "本品外用即可"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "儿童、孕妇和哺乳期妇女禁用强力枇杷露。",
+        "keywords": [
+          "儿童禁用",
+          "孕妇禁用",
+          "哺乳期禁用",
+          "禁忌"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "儿童可以随意服用",
+          "孕妇可以服用本品止咳",
+          "哺乳期妇女可以正常使用本品"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "对强力枇杷露及所含成分过敏者禁用。",
+        "keywords": [
+          "过敏禁用",
+          "成分过敏",
+          "禁忌"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "过敏体质也一定可以用",
+          "对成分过敏也能服用本品"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "糖尿病患者禁服强力枇杷露。",
+        "keywords": [
+          "糖尿病患者禁服",
+          "禁忌",
+          "蔗糖"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "糖尿病患者可以正常喝本品",
+          "本品适合糖尿病咳嗽患者自行服用"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "强力枇杷露可见的不良反应包括恶心、呕吐、腹胀、腹泻、腹部不适、口干、便秘、眼胀、皮疹、瘙痒、头痛、胸部不适、乏力、呼吸困难、心悸、失眠和潮红等。",
+        "keywords": [
+          "不良反应",
+          "恶心",
+          "呕吐",
+          "腹泻",
+          "皮疹",
+          "呼吸困难",
+          "心悸",
+          "失眠"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "本品完全没有不良反应",
+          "服用本品绝不会出现胃肠道不适",
+          "本品不会引起过敏相关反应"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "说明书提示过量服用强力枇杷露可导致药物依赖，并有急性肾病和过敏性休克的个案报告。",
+        "keywords": [
+          "过量服用",
+          "药物依赖",
+          "急性肾病",
+          "过敏性休克",
+          "风险"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "本品长期大量服用也不会依赖",
+          "本品过量服用没有严重风险",
+          "本品不可能引起过敏性休克"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "强力枇杷露含罂粟壳，不宜长期服用，服药3天症状无缓解应去医院就诊。",
+        "keywords": [
+          "含罂粟壳",
+          "不宜长期服用",
+          "3天无缓解就医",
+          "注意事项"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "本品可以长期当止咳糖浆喝",
+          "本品不含罂粟壳",
+          "吃多久都没关系"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "服用强力枇杷露期间应忌烟、酒及辛辣、生冷、油腻食物。",
+        "keywords": [
+          "忌烟酒",
+          "辛辣",
+          "生冷",
+          "油腻",
+          "饮食注意"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "服药期间饮食没有任何限制",
+          "服药时可以随意饮酒吃辛辣"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "服用强力枇杷露期间不宜同时服用滋补性中药。",
+        "keywords": [
+          "滋补性中药",
+          "同时服用",
+          "注意事项"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "本品可以和任何滋补中药一起吃",
+          "服药期间合并滋补中药没有问题"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "有支气管扩张、肺脓疡、肺结核或肺心病的患者出现咳嗽时，应去医院就诊。",
+        "keywords": [
+          "支气管扩张",
+          "肺脓疡",
+          "肺结核",
+          "肺心病",
+          "就医"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "这些疾病引起的咳嗽只靠本品就够了",
+          "肺结核咳嗽可以自行长期喝本品"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "严重高血压患者和年老体弱者应在医师指导下服用强力枇杷露。",
+        "keywords": [
+          "严重高血压",
+          "年老体弱",
+          "医师指导",
+          "慎用"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "严重高血压患者可自行服用",
+          "老年体弱者无需指导即可长期使用"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "过敏体质者应慎用强力枇杷露。",
+        "keywords": [
+          "过敏体质",
+          "慎用",
+          "注意事项"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "过敏体质者使用本品完全没有风险"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "运动员应慎用强力枇杷露。",
+        "keywords": [
+          "运动员慎用",
+          "注意事项"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "运动员可以随意使用本品"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "驾驶员以及从事车、船、机械作业、精密作业和操作精密仪器者应慎用强力枇杷露。",
+        "keywords": [
+          "驾驶员慎用",
+          "机械作业",
+          "精密作业",
+          "操作精密仪器"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "开车时服用本品完全不需注意",
+          "精密作业人员服用本品没有影响"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "如正在使用其他药品，使用强力枇杷露前应咨询医师或药师，因为与其他药物同时使用可能发生药物相互作用。",
+        "keywords": [
+          "药物相互作用",
+          "其他药品",
+          "咨询医师",
+          "咨询药师"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "本品和任何药都不会相互作用",
+          "联合用药无需咨询"
+        ]
+      },
+      {
+        "category": "applicable_scene",
+        "fact": "强力枇杷露适用于以咳嗽为主、痰量不多、咳嗽偏干偏刺激且有一定持续性的场景。",
+        "keywords": [
+          "咳嗽为主",
+          "痰量不多",
+          "偏干",
+          "偏刺激",
+          "持续性咳嗽"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "本品更适合大量浓痰的急性咳嗽",
+          "只要喉咙痛就适合用本品"
+        ]
+      },
+      {
+        "category": "differentiation",
+        "fact": "强力枇杷露不属于痰多、痰黄稠厚型咳嗽的典型首选产品。",
+        "keywords": [
+          "不是典型首选",
+          "痰多",
+          "痰黄稠厚",
+          "产品对比"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "痰黄稠厚咳嗽首选强力枇杷露",
+          "本品专门针对黄痰浓痰"
+        ]
+      },
+      {
+        "category": "basic_info",
+        "fact": "强力枇杷露性状为棕色至深棕色液体，气香，味甜。",
+        "keywords": [
+          "性状",
+          "棕色至深棕色",
+          "气香",
+          "味甜"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": [
+          "本品是白色混悬液",
+          "本品无味不甜"
+        ]
+      },
+      {
+        "category": "basic_info",
+        "fact": "强力枇杷露规格为每1毫升相当于饮片0.155克，含薄荷脑0.15毫克。",
+        "keywords": [
+          "规格",
+          "每1毫升",
+          "饮片0.155克",
+          "薄荷脑0.15毫克"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": [
+          "本品每毫升不含薄荷脑",
+          "本品规格与说明书不符"
+        ]
+      },
+      {
+        "category": "basic_info",
+        "fact": "强力枇杷露包装规格为每瓶120毫升，每盒1瓶。",
+        "keywords": [
+          "包装",
+          "120毫升",
+          "每盒1瓶"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": [
+          "本品标准包装是10支装",
+          "本品每瓶不是120毫升"
+        ]
+      },
+      {
+        "category": "basic_info",
+        "fact": "强力枇杷露应密封并置阴凉处保存，贮藏温度不超过20℃，有效期为36个月。",
+        "keywords": [
+          "贮藏",
+          "密封",
+          "阴凉处",
+          "不超过20℃",
+          "有效期36个月"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": [
+          "本品可高温暴晒保存",
+          "本品有效期不是36个月"
+        ]
+      },
+      {
+        "category": "basic_info",
+        "fact": "强力枇杷露批准文号为国药准字Z51021805，上市许可持有人和生产企业均为华润三九（雅安）药业有限公司。",
+        "keywords": [
+          "批准文号",
+          "国药准字Z51021805",
+          "华润三九",
+          "生产企业"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": [
+          "本品没有国药准字",
+          "本品不是华润三九（雅安）药业有限公司生产"
+        ]
+      }
+    ],
+    "fact_count": 29
+  },
+  "感冒灵": {
+    "product_name": "感冒灵",
+    "facts": [
+      {
+        "category": "basic_info",
+        "fact": "本品通用名称为感冒灵颗粒，常用名称为999感冒灵颗粒。",
+        "keywords": [
+          "感冒灵颗粒",
+          "999感冒灵颗粒",
+          "通用名称",
+          "常用名称"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "999感冒灵颗粒不是感冒灵颗粒",
+          "感冒灵和999感冒灵颗粒是完全不同的药"
+        ]
+      },
+      {
+        "category": "mechanism",
+        "fact": "999感冒灵颗粒为中西药复方制剂，兼有中药配方和西药退热镇痛成分。",
+        "keywords": [
+          "中西药复方",
+          "复方制剂",
+          "产品特点",
+          "退热镇痛"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "999感冒灵颗粒是纯中药",
+          "999感冒灵颗粒不含西药成分"
+        ]
+      },
+      {
+        "category": "efficacy",
+        "fact": "999感冒灵颗粒的主要功效是解热镇痛。",
+        "keywords": [
+          "解热镇痛",
+          "功效",
+          "退热",
+          "止痛"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "999感冒灵颗粒主要是抗生素",
+          "999感冒灵颗粒没有退热止痛作用"
+        ]
+      },
+      {
+        "category": "efficacy",
+        "fact": "999感冒灵颗粒用于缓解普通感冒引起的头痛、发热、鼻塞、流涕、咽痛等症状。",
+        "keywords": [
+          "普通感冒",
+          "头痛",
+          "发热",
+          "鼻塞",
+          "流涕",
+          "咽痛",
+          "适应症"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "999感冒灵颗粒用于治疗细菌感染",
+          "999感冒灵颗粒只治咳嗽",
+          "999感冒灵颗粒可替代抗感染治疗"
+        ]
+      },
+      {
+        "category": "applicable_scene",
+        "fact": "999感冒灵颗粒适用于普通感冒常见症状的对症缓解，而非针对病因治疗。",
+        "keywords": [
+          "对症缓解",
+          "普通感冒",
+          "适用场景",
+          "症状缓解"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "999感冒灵颗粒能根治所有感冒",
+          "999感冒灵颗粒能直接杀灭病毒"
+        ]
+      },
+      {
+        "category": "ingredients",
+        "fact": "999感冒灵颗粒主要成分包括三叉苦、金盏银盘、野菊花、岗梅、咖啡因、对乙酰氨基酚、马来酸氯苯那敏和薄荷素油。",
+        "keywords": [
+          "成分",
+          "三叉苦",
+          "金盏银盘",
+          "野菊花",
+          "岗梅",
+          "咖啡因",
+          "对乙酰氨基酚",
+          "马来酸氯苯那敏",
+          "薄荷素油"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "999感冒灵颗粒只含中药",
+          "999感冒灵颗粒不含对乙酰氨基酚",
+          "999感冒灵颗粒不含马来酸氯苯那敏"
+        ]
+      },
+      {
+        "category": "ingredients",
+        "fact": "999感冒灵颗粒辅料为蔗糖。",
+        "keywords": [
+          "辅料",
+          "蔗糖",
+          "糖分"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "999感冒灵颗粒不含糖",
+          "糖尿病患者无需关注本品含糖情况"
+        ]
+      },
+      {
+        "category": "basic_info",
+        "fact": "本品每袋装10克，每袋含对乙酰氨基酚0.2克、咖啡因4毫克、马来酸氯苯那敏4毫克。",
+        "keywords": [
+          "规格",
+          "10克",
+          "对乙酰氨基酚0.2克",
+          "咖啡因4毫克",
+          "马来酸氯苯那敏4毫克"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "每袋999感冒灵颗粒不含对乙酰氨基酚",
+          "999感冒灵颗粒每袋剂量不是10克"
+        ]
+      },
+      {
+        "category": "usage",
+        "fact": "999感冒灵颗粒的用法为开水冲服。",
+        "keywords": [
+          "开水冲服",
+          "服用方式",
+          "用法"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "999感冒灵颗粒需要干吞",
+          "999感冒灵颗粒只能嚼服"
+        ]
+      },
+      {
+        "category": "usage",
+        "fact": "999感冒灵颗粒推荐用量为一次10克即1袋，一日3次。",
+        "keywords": [
+          "用量",
+          "一次1袋",
+          "一次10克",
+          "一日3次"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "999感冒灵颗粒一次可以随意加量",
+          "999感冒灵颗粒一天只需服1次"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "严重肝肾功能不全者禁用999感冒灵颗粒。",
+        "keywords": [
+          "禁用",
+          "严重肝肾功能不全",
+          "肝肾功能不全"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "严重肝肾功能不全者也可正常服用999感冒灵颗粒"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "对999感冒灵颗粒过敏者禁用本品。",
+        "keywords": [
+          "过敏",
+          "禁用",
+          "对本品过敏"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "对999感冒灵颗粒过敏也可以继续服用"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "999感冒灵颗粒偶见皮疹、荨麻疹、药热、粒细胞减少等不良反应。",
+        "keywords": [
+          "不良反应",
+          "皮疹",
+          "荨麻疹",
+          "药热",
+          "粒细胞减少"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "999感冒灵颗粒完全没有不良反应"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "服用999感冒灵颗粒后还可能出现困倦、嗜睡、口渴、虚弱感等反应。",
+        "keywords": [
+          "困倦",
+          "嗜睡",
+          "口渴",
+          "虚弱感",
+          "不良反应"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "999感冒灵颗粒绝不会引起嗜睡",
+          "服用999感冒灵颗粒后可以完全不考虑困倦风险"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "长期大量服用999感冒灵颗粒可能导致肝肾功能异常。",
+        "keywords": [
+          "长期大量用药",
+          "肝肾功能异常",
+          "肝损伤",
+          "肾损伤"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "999感冒灵颗粒长期大量服用也很安全",
+          "999感冒灵颗粒不会影响肝肾功能"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "999感冒灵颗粒不得与含对乙酰氨基酚或其他成分相似的复方感冒药同时服用，以免重复用药增加不良反应和肝损伤风险。",
+        "keywords": [
+          "重复用药",
+          "对乙酰氨基酚",
+          "复方感冒药",
+          "肝损伤",
+          "联合用药"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "999感冒灵颗粒可以和其他含对乙酰氨基酚的感冒药一起吃",
+          "多种复方感冒药联用更有效"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "服用999感冒灵颗粒期间不得饮酒或饮用含酒精的饮料。",
+        "keywords": [
+          "饮酒",
+          "酒精",
+          "含酒精饮料",
+          "禁酒"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "服用999感冒灵颗粒期间可以喝酒",
+          "少量饮酒不影响999感冒灵颗粒使用"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "999感冒灵颗粒应避免与有明显镇静、嗜睡作用的药物或抗过敏药叠加使用，以免加重嗜睡和中枢抑制。",
+        "keywords": [
+          "镇静药",
+          "抗过敏药",
+          "嗜睡",
+          "中枢抑制",
+          "联合用药"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "999感冒灵颗粒和镇静药一起吃更助眠",
+          "999感冒灵颗粒与抗过敏药联用没有任何风险"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "999感冒灵颗粒与其他解热镇痛药并用时，肾毒性风险可能增加。",
+        "keywords": [
+          "解热镇痛药",
+          "肾毒性",
+          "并用风险",
+          "药物相互作用"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "999感冒灵颗粒和其他退烧止痛药一起吃更安全",
+          "与其他解热镇痛药联用不会增加风险"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "肝、肾功能不全者应慎用999感冒灵颗粒。",
+        "keywords": [
+          "慎用",
+          "肝功能不全",
+          "肾功能不全"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "所有肝肾功能不全者都可随意服用999感冒灵颗粒"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "膀胱颈梗阻、甲状腺功能亢进、青光眼、高血压和前列腺肥大者应慎用999感冒灵颗粒。",
+        "keywords": [
+          "膀胱颈梗阻",
+          "甲状腺功能亢进",
+          "青光眼",
+          "高血压",
+          "前列腺肥大",
+          "慎用"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "青光眼患者服用999感冒灵颗粒无需注意",
+          "高血压患者服用999感冒灵颗粒完全没有限制"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "孕妇及哺乳期妇女应慎用999感冒灵颗粒。",
+        "keywords": [
+          "孕妇",
+          "哺乳期",
+          "慎用"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "孕妇可以自行长期服用999感冒灵颗粒",
+          "哺乳期使用999感冒灵颗粒完全无需咨询医生"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "服用999感冒灵颗粒期间不得驾驶机、车、船，也不得从事高空作业、机械作业及操作精密仪器。",
+        "keywords": [
+          "驾驶",
+          "高空作业",
+          "机械作业",
+          "精密仪器",
+          "嗜睡"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "服用999感冒灵颗粒后可以正常开车",
+          "999感冒灵颗粒不影响高空或机械作业"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "脾胃虚寒且有腹痛、喜暖、泄泻者应慎用999感冒灵颗粒。",
+        "keywords": [
+          "脾胃虚寒",
+          "腹痛",
+          "喜暖",
+          "泄泻",
+          "慎用"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "脾胃虚寒腹泻者服用999感冒灵颗粒没有任何顾虑"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "糖尿病患者及有心脏病等严重慢性病者应在医师指导下服用999感冒灵颗粒。",
+        "keywords": [
+          "糖尿病",
+          "心脏病",
+          "慢性病",
+          "医师指导"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "糖尿病患者可随意服用999感冒灵颗粒",
+          "严重慢性病患者无需医生指导即可服用"
+        ]
+      },
+      {
+        "category": "applicable_scene",
+        "fact": "儿童、年老体弱者应在医师指导下使用999感冒灵颗粒，儿童必须在成人监护下使用。",
+        "keywords": [
+          "儿童",
+          "老年人",
+          "年老体弱",
+          "成人监护",
+          "医师指导"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "儿童可以自行服用999感冒灵颗粒",
+          "老年体弱者使用999感冒灵颗粒不需要指导"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "服用999感冒灵颗粒3天后症状无改善、症状加重或出现胸闷心悸等新的严重症状时，应立即停药并就医。",
+        "keywords": [
+          "3天无改善",
+          "症状加重",
+          "胸闷",
+          "心悸",
+          "停药就医"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "服用999感冒灵颗粒无效也可以一直自行继续吃",
+          "出现胸闷心悸后无需停药就医"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "999感冒灵颗粒性状发生改变时禁止使用。",
+        "keywords": [
+          "性状改变",
+          "禁止使用"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "药品外观改变后仍可继续服用"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "如正在使用其他药品，使用999感冒灵颗粒前应咨询医师或药师。",
+        "keywords": [
+          "其他药品",
+          "咨询医师",
+          "咨询药师",
+          "药物相互作用"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "999感冒灵颗粒与任何药都能随便同服"
+        ]
+      },
+      {
+        "category": "differentiation",
+        "fact": "从中医辨证角度看，999感冒灵颗粒的中药配方更偏向风热感冒。",
+        "keywords": [
+          "风热感冒",
+          "中医辨证",
+          "偏风热"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "999感冒灵颗粒更偏风寒感冒",
+          "999感冒灵颗粒完全不偏风热"
+        ]
+      },
+      {
+        "category": "differentiation",
+        "fact": "虽然中药配方偏风热，但因普通感冒症状可动态变化且本品含西药成分，999感冒灵颗粒可用于各种类型普通感冒的对症缓解。",
+        "keywords": [
+          "风寒风热",
+          "各种类型普通感冒",
+          "对症缓解",
+          "产品区分"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "999感冒灵颗粒只适用于风热感冒",
+          "999感冒灵颗粒完全不能用于风寒感冒症状缓解"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "服药期间应忌烟、酒及辛辣、生冷、油腻食物。",
+        "keywords": [
+          "忌烟",
+          "忌酒",
+          "辛辣",
+          "生冷",
+          "油腻食物"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "服用999感冒灵颗粒期间饮食无需注意"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "服用999感冒灵颗粒期间不宜同时服用滋补性中成药。",
+        "keywords": [
+          "滋补性中成药",
+          "不宜同服"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "999感冒灵颗粒可以和任何滋补中成药同时服用"
+        ]
+      },
+      {
+        "category": "basic_info",
+        "fact": "999感冒灵颗粒为浅棕色至深棕色颗粒，味甜、微苦。",
+        "keywords": [
+          "性状",
+          "浅棕色",
+          "深棕色",
+          "味甜",
+          "微苦"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": []
+      },
+      {
+        "category": "basic_info",
+        "fact": "999感冒灵颗粒包装为复合膜，每盒装9袋，有效期24个月，贮藏要求为密封。",
+        "keywords": [
+          "包装",
+          "每盒9袋",
+          "有效期24个月",
+          "密封"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": []
+      },
+      {
+        "category": "basic_info",
+        "fact": "999感冒灵颗粒的上市许可持有人为华润三九医药股份有限公司，生产企业为华润三九（郴州）制药有限公司。",
+        "keywords": [
+          "华润三九医药股份有限公司",
+          "华润三九（郴州）制药有限公司",
+          "上市许可持有人",
+          "生产企业"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": []
+      }
+    ],
+    "fact_count": 36
+  },
+  "抗病毒": {
+    "product_name": "抗病毒",
+    "facts": [
+      {
+        "category": "basic_info",
+        "fact": "本品通用名称为抗病毒口服液，常用名称为999抗病毒口服液。",
+        "keywords": [
+          "抗病毒口服液",
+          "999抗病毒口服液",
+          "通用名称",
+          "常用名称"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "本品的通用名称是999抗病毒口服液",
+          "本品不是抗病毒口服液"
+        ]
+      },
+      {
+        "category": "efficacy",
+        "fact": "999抗病毒口服液的说明书功能主治为清热祛湿、凉血解毒，用于风热感冒、流感。",
+        "keywords": [
+          "清热祛湿",
+          "凉血解毒",
+          "风热感冒",
+          "流感",
+          "功能主治"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "999抗病毒口服液主要用于风寒感冒",
+          "本品适用于所有类型感冒且不分寒热",
+          "本品的核心功效是止咳化痰"
+        ]
+      },
+      {
+        "category": "efficacy",
+        "fact": "本品常用于缓解风热感冒或流感相关的咽喉肿痛、鼻塞、发热、咽喉不适等上呼吸道症状。",
+        "keywords": [
+          "咽喉肿痛",
+          "鼻塞",
+          "发热",
+          "咽喉不适",
+          "上呼吸道症状"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "本品主要治腹泻",
+          "本品主要治咳喘",
+          "本品只适合没有发热的感冒"
+        ]
+      },
+      {
+        "category": "applicable_scene",
+        "fact": "999抗病毒口服液更适合风热感冒、流行性感冒、上呼吸道感染、病毒性感冒等偏热象的场景。",
+        "keywords": [
+          "风热感冒",
+          "流行性感冒",
+          "上呼吸道感染",
+          "病毒性感冒",
+          "热象"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "本品更适合风寒感冒",
+          "受凉怕冷流清涕时最对症",
+          "本品只适用于细菌感染"
+        ]
+      },
+      {
+        "category": "differentiation",
+        "fact": "本品的中医定位偏清热解毒、祛湿、凉血，更适合风热、热毒、湿邪并见的感冒症状，而非典型风寒感冒。",
+        "keywords": [
+          "风热",
+          "风寒",
+          "热毒",
+          "湿邪",
+          "产品区分"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "999抗病毒口服液和治风寒感冒的药没有区别",
+          "本品适合畏寒重、清鼻涕明显的风寒感冒"
+        ]
+      },
+      {
+        "category": "ingredients",
+        "fact": "本品主要成分包括板蓝根、石膏、芦根、地黄、郁金、知母、石菖蒲、广藿香、连翘。",
+        "keywords": [
+          "板蓝根",
+          "石膏",
+          "芦根",
+          "地黄",
+          "郁金",
+          "知母",
+          "石菖蒲",
+          "广藿香",
+          "连翘",
+          "主要成分"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "本品主要成分是奥司他韦",
+          "本品含有抗生素",
+          "本品只有板蓝根一种成分"
+        ]
+      },
+      {
+        "category": "mechanism",
+        "fact": "本品组方整体体现清热解毒、凉血利咽、清热泻火、化湿和中等特点。",
+        "keywords": [
+          "清热解毒",
+          "凉血利咽",
+          "清热泻火",
+          "化湿和中",
+          "组方特点"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "本品主要通过镇咳平喘起效",
+          "本品没有清热解毒作用"
+        ]
+      },
+      {
+        "category": "mechanism",
+        "fact": "板蓝根和连翘偏重清热解毒，石膏和知母偏重清热泻火，广藿香和石菖蒲偏重化湿和胃。",
+        "keywords": [
+          "板蓝根",
+          "连翘",
+          "石膏",
+          "知母",
+          "广藿香",
+          "石菖蒲",
+          "清热解毒",
+          "化湿和胃"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": [
+          "石膏和知母主要用于温补",
+          "广藿香和石菖蒲主要是止咳平喘药"
+        ]
+      },
+      {
+        "category": "usage",
+        "fact": "本品用法为口服。",
+        "keywords": [
+          "口服",
+          "用法"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "本品需要外用",
+          "本品需要雾化吸入",
+          "本品需要注射使用"
+        ]
+      },
+      {
+        "category": "usage",
+        "fact": "本品常用用量为一次10毫升，一日2～3次，小儿酌减。",
+        "keywords": [
+          "一次10毫升",
+          "一日2到3次",
+          "小儿酌减",
+          "用量"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "本品一次20毫升",
+          "本品一天只需一次",
+          "儿童用量与成人完全相同且无需调整"
+        ]
+      },
+      {
+        "category": "usage",
+        "fact": "产品资料显示可于早饭前和午、晚饭后各服一次。",
+        "keywords": [
+          "早饭前",
+          "午饭后",
+          "晚饭后",
+          "服用时间"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": [
+          "本品必须空腹三次服用",
+          "本品只能饭后服用且不能饭前服用"
+        ]
+      },
+      {
+        "category": "applicable_scene",
+        "fact": "本品在流感或风热感冒初期、刚出现咽喉不适、鼻塞、发热等症状时尽早使用更合适。",
+        "keywords": [
+          "流感初期",
+          "尽早使用",
+          "早期用药",
+          "咽喉不适",
+          "鼻塞",
+          "发热"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "本品一定要等症状很重再吃",
+          "本品在流感早期使用没有意义"
+        ]
+      },
+      {
+        "category": "differentiation",
+        "fact": "产品资料提到本品在流感相关场景可尽早使用，但单药疗效不如奥司他韦，不能等同于抗流感特效药。",
+        "keywords": [
+          "奥司他韦",
+          "流感",
+          "单药疗效",
+          "不能等同特效药"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "999抗病毒口服液治疗流感一定比奥司他韦更强",
+          "本品可以完全替代奥司他韦",
+          "本品是甲流特效药"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "本品禁用于孕妇和哺乳期妇女。",
+        "keywords": [
+          "孕妇禁用",
+          "哺乳期禁用",
+          "禁忌"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "孕妇可以放心使用本品",
+          "哺乳期妇女可以随意服用本品"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "本品监测到的不良反应包括恶心、呕吐、腹泻、腹痛、腹胀、腹部不适、皮疹、瘙痒及过敏反应等。",
+        "keywords": [
+          "恶心",
+          "呕吐",
+          "腹泻",
+          "腹痛",
+          "腹胀",
+          "皮疹",
+          "瘙痒",
+          "过敏反应",
+          "不良反应"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "本品完全没有不良反应",
+          "本品只会引起嗜睡",
+          "服用本品不会出现胃肠道不适"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "服用本品期间应忌烟、酒及辛辣、生冷、油腻食物。",
+        "keywords": [
+          "忌烟酒",
+          "辛辣",
+          "生冷",
+          "油腻",
+          "注意事项"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "服药期间饮酒不影响疗效",
+          "服药期间饮食无需注意",
+          "服药时可以大量吃辛辣油腻食物"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "胃肠道敏感者使用本品时应留意恶心、腹泻、腹痛等胃肠道不适反应。",
+        "keywords": [
+          "胃肠道敏感",
+          "恶心",
+          "腹泻",
+          "腹痛",
+          "注意不适"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "胃肠道敏感者服用本品绝不会不适",
+          "出现腹泻腹痛与本品无关"
+        ]
+      },
+      {
+        "category": "applicable_scene",
+        "fact": "感冒时可以使用本品，但更适合风热感冒或流感早期等符合其清热解毒定位的情况。",
+        "keywords": [
+          "感冒能不能吃",
+          "风热感冒",
+          "流感早期",
+          "清热解毒定位"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "任何感冒都首选本品",
+          "普通受凉风寒感冒一定最适合本品",
+          "感冒时绝对不能吃本品"
+        ]
+      },
+      {
+        "category": "differentiation",
+        "fact": "本品并非单纯按“抗病毒”字面理解使用，而是以风热感冒、流感等热性上呼吸道症状为主要适用方向。",
+        "keywords": [
+          "抗病毒",
+          "不是字面泛用",
+          "风热感冒",
+          "热性症状",
+          "产品定位"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "名字叫抗病毒就能治疗所有病毒感染",
+          "只要怀疑病毒感染都适合吃本品",
+          "本品对任何病毒性疾病都通用"
+        ]
+      },
+      {
+        "category": "basic_info",
+        "fact": "本品规格为每支10毫升，常见包装有10毫升×10支和10毫升×12支。",
+        "keywords": [
+          "10毫升",
+          "10支",
+          "12支",
+          "规格",
+          "包装"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": [
+          "本品每支20毫升",
+          "本品只有12支装没有其他规格"
+        ]
+      },
+      {
+        "category": "basic_info",
+        "fact": "本品批准文号为国药准字Z33020518。",
+        "keywords": [
+          "国药准字Z33020518",
+          "批准文号"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": [
+          "本品没有批准文号",
+          "本品批准文号是其他号码"
+        ]
+      },
+      {
+        "category": "basic_info",
+        "fact": "本品药品上市许可持有人和生产企业均为杭州华润老桐君药业有限公司。",
+        "keywords": [
+          "杭州华润老桐君药业有限公司",
+          "上市许可持有人",
+          "生产企业"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": [
+          "本品不是杭州华润老桐君药业有限公司生产",
+          "本品生产企业与上市许可持有人完全无关"
+        ]
+      }
+    ],
+    "fact_count": 22
+  },
+  "易善复": {
+    "product_name": "易善复",
+    "facts": [
+      {
+        "category": "basic_info",
+        "fact": "易善复的通用名称为多烯磷脂酰胆碱胶囊，英文名称为Polyene Phosphatidylcholine Capsules。",
+        "keywords": [
+          "易善复",
+          "多烯磷脂酰胆碱胶囊",
+          "通用名",
+          "英文名"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "易善复的通用名是护肝片",
+          "易善复不是药品名称对应的胶囊制剂"
+        ]
+      },
+      {
+        "category": "basic_info",
+        "fact": "易善复属于辅助用药类非处方药（OTC），是药品而不是保健品。",
+        "keywords": [
+          "OTC",
+          "非处方药",
+          "药品",
+          "不是保健品",
+          "辅助用药"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "易善复是保健品",
+          "易善复只是营养补充剂",
+          "易善复不是药"
+        ]
+      },
+      {
+        "category": "ingredients",
+        "fact": "易善复每粒含核心成分多烯磷脂酰胆碱228毫克。",
+        "keywords": [
+          "成分",
+          "多烯磷脂酰胆碱",
+          "228毫克",
+          "每粒"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "易善复的主要成分是水飞蓟素",
+          "易善复不含多烯磷脂酰胆碱",
+          "易善复每粒不是228毫克"
+        ]
+      },
+      {
+        "category": "ingredients",
+        "fact": "易善复所含多烯磷脂酰胆碱为天然来源成分，含有大量不饱和脂肪酸基，主要包括亚油酸、亚麻酸和油酸，其中亚油酸约占70%。",
+        "keywords": [
+          "天然来源",
+          "不饱和脂肪酸",
+          "亚油酸",
+          "亚麻酸",
+          "油酸"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "易善复是纯化学合成成分且不含不饱和脂肪酸基",
+          "易善复不含亚油酸"
+        ]
+      },
+      {
+        "category": "efficacy",
+        "fact": "易善复适用于酒精、药物、毒物、化学物质等引起的中毒性肝损伤的辅助改善。",
+        "keywords": [
+          "中毒性肝损伤",
+          "酒精性",
+          "药物性",
+          "毒物",
+          "化学物质",
+          "辅助改善"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "易善复只适用于脂肪肝",
+          "易善复不能用于酒精或药物引起的肝损伤",
+          "易善复可直接根治所有肝损伤"
+        ]
+      },
+      {
+        "category": "efficacy",
+        "fact": "易善复可用于脂肪肝、肝炎患者出现的食欲不振和右上腹压迫感等症状的辅助改善。",
+        "keywords": [
+          "脂肪肝",
+          "肝炎",
+          "食欲不振",
+          "右上腹压迫感",
+          "症状改善"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "易善复对脂肪肝完全无用",
+          "易善复可直接治愈脂肪肝",
+          "易善复适应症包括所有肝病的根治"
+        ]
+      },
+      {
+        "category": "applicable_scene",
+        "fact": "易善复的核心使用场景包括脂肪肝、肝功能异常相关人群、药物性肝损伤、酒精性肝损伤及其他中毒性肝损伤的辅助改善。",
+        "keywords": [
+          "使用场景",
+          "脂肪肝",
+          "肝功能异常",
+          "药物性肝损伤",
+          "酒精性肝损伤"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "易善复只适合健康人日常保养",
+          "易善复与肝功能异常无关"
+        ]
+      },
+      {
+        "category": "mechanism",
+        "fact": "易善复的主要作用特点是修复并稳定肝细胞膜，辅助改善肝脏代谢功能和肝损伤相关症状。",
+        "keywords": [
+          "肝细胞膜修复",
+          "稳定肝细胞膜",
+          "肝脏代谢功能",
+          "护肝机制"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "易善复主要通过镇痛退热发挥作用",
+          "易善复与肝细胞膜修复无关"
+        ]
+      },
+      {
+        "category": "mechanism",
+        "fact": "研究提示易善复可促进膜的再生和稳定，并具有抑制脂质过氧化和抑制胶原合成的作用方向。",
+        "keywords": [
+          "膜再生",
+          "脂质过氧化",
+          "抑制胶原合成",
+          "作用机制"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "易善复没有任何已知机制支持",
+          "易善复会促进脂质过氧化"
+        ]
+      },
+      {
+        "category": "mechanism",
+        "fact": "在实验模型中，易善复显示出对急性肝损伤的肝脏保护作用，并在慢性模型中观察到抑制脂肪变性和纤维化的方向。",
+        "keywords": [
+          "肝脏保护",
+          "急性肝损伤",
+          "脂肪变性",
+          "纤维化",
+          "实验模型"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "易善复会加重脂肪变性",
+          "易善复对肝损伤没有保护作用"
+        ]
+      },
+      {
+        "category": "differentiation",
+        "fact": "易善复与单纯营养补充型保健产品不同，其定位是用于肝损伤和脂肪肝相关问题辅助治疗的OTC药物。",
+        "keywords": [
+          "区别",
+          "保健品",
+          "OTC药物",
+          "辅助治疗",
+          "护肝药"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "易善复和普通保健品没有区别",
+          "易善复只是补充营养的产品"
+        ]
+      },
+      {
+        "category": "differentiation",
+        "fact": "易善复的差异化特点在于以多烯磷脂酰胆碱为核心，侧重肝细胞膜修复，而非仅作一般性保肝营养补充。",
+        "keywords": [
+          "差异化",
+          "多烯磷脂酰胆碱",
+          "肝细胞膜修复",
+          "一般保肝"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "所有护肝产品机制都和易善复完全一样",
+          "易善复没有明确的产品特点"
+        ]
+      },
+      {
+        "category": "usage",
+        "fact": "12岁以上儿童、青少年和成年人开始用量为每日3次，每次2粒，每日最大剂量不超过6粒。",
+        "keywords": [
+          "用法用量",
+          "12岁以上",
+          "每日3次",
+          "每次2粒",
+          "最大6粒"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "易善复成人一次只需半粒",
+          "易善复可以随意加量超过6粒",
+          "12岁以上起始剂量是每日一次"
+        ]
+      },
+      {
+        "category": "usage",
+        "fact": "易善复的一般维持剂量为每日3次，每次1粒。",
+        "keywords": [
+          "维持剂量",
+          "每日3次",
+          "每次1粒"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "易善复没有维持剂量",
+          "易善复维持剂量仍必须每次2粒"
+        ]
+      },
+      {
+        "category": "usage",
+        "fact": "易善复应随餐服用，并用足够量液体整粒吞服，不要咀嚼。",
+        "keywords": [
+          "随餐服用",
+          "整粒吞服",
+          "不要咀嚼",
+          "服用方法"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "易善复可以空腹嚼碎服用",
+          "易善复必须含服",
+          "易善复服用时不需要液体"
+        ]
+      },
+      {
+        "category": "usage",
+        "fact": "如需长期服用易善复，应在医师指导下使用。",
+        "keywords": [
+          "长期服用",
+          "医师指导",
+          "遵医嘱"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "易善复可以长期自行随便吃",
+          "易善复长期服用不需要任何指导"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "已知对大豆制剂、磷脂酰胆碱或本品任何成分过敏者禁用易善复。",
+        "keywords": [
+          "禁忌",
+          "大豆过敏",
+          "磷脂酰胆碱过敏",
+          "成分过敏"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "大豆过敏者也可以放心使用易善复",
+          "对本品成分过敏不影响使用"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "易善复大剂量服用时偶尔可出现胃肠道紊乱，如胃部不适、软便和腹泻。",
+        "keywords": [
+          "不良反应",
+          "胃部不适",
+          "软便",
+          "腹泻",
+          "胃肠道紊乱"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "易善复绝对没有任何胃肠道不良反应",
+          "易善复常见不良反应是严重肾毒性"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "易善复在极罕见情况下可能出现过敏反应，如皮疹、荨麻疹和瘙痒。",
+        "keywords": [
+          "过敏反应",
+          "皮疹",
+          "荨麻疹",
+          "瘙痒"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "易善复不可能引起过敏",
+          "出现皮疹与易善复无关"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "易善复为辅助治疗药，首次使用前应咨询医师，治疗期间应定期到医院检查。",
+        "keywords": [
+          "辅助治疗药",
+          "首次使用",
+          "咨询医师",
+          "定期检查"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "易善复可以完全替代正规检查和医生评估",
+          "首次使用不需要咨询医生"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "使用易善复期间应避免摄入酒精等对肝脏有害的物质。",
+        "keywords": [
+          "避免饮酒",
+          "酒精",
+          "伤肝因素",
+          "注意事项"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "吃易善复时可以继续大量饮酒",
+          "服用易善复后酒精对肝脏就没有影响"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "慢性肝炎患者如服药后主观临床症状不能明显改善，应停药并就医。",
+        "keywords": [
+          "慢性肝炎",
+          "停药",
+          "就医",
+          "症状未改善"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "慢性肝炎患者服后无效也应继续长期自行服用",
+          "症状不改善无需处理"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "易善复不推荐在妊娠期或哺乳期应用。",
+        "keywords": [
+          "妊娠期",
+          "哺乳期",
+          "不推荐使用"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "孕妇可以随意使用易善复",
+          "哺乳期使用易善复完全没有限制"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "易善复不得用于12岁以下儿童。",
+        "keywords": [
+          "12岁以下",
+          "儿童禁用",
+          "年龄限制"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "12岁以下儿童也可按成人剂量服用易善复",
+          "婴幼儿可以使用易善复"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "易善复应严格按推荐剂量服用，不得超量。",
+        "keywords": [
+          "推荐剂量",
+          "不得超量",
+          "剂量限制"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "易善复多吃效果更好",
+          "易善复可以自行加倍剂量"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "过敏体质者应慎用易善复。",
+        "keywords": [
+          "过敏体质",
+          "慎用"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "过敏体质者使用易善复无需注意"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "本品性状发生改变时禁止使用。",
+        "keywords": [
+          "性状改变",
+          "禁止使用"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "胶囊外观改变后仍可继续服用"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "儿童使用易善复必须在成人监护下进行，并应放在儿童不能接触的地方。",
+        "keywords": [
+          "成人监护",
+          "儿童不能接触",
+          "安全用药"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "儿童可以自行取用和服用易善复"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "如正在使用其他药品，服用易善复前应咨询医师或药师。",
+        "keywords": [
+          "合并用药",
+          "咨询医师",
+          "咨询药师",
+          "药物相互作用"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "易善复与任何药物合用都不需要咨询",
+          "易善复绝对不存在相互作用风险"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "易善复与其他药物之间的相互作用尚无法排除，与双香豆素类药物同用时需咨询医生并可能调整剂量。",
+        "keywords": [
+          "药物相互作用",
+          "双香豆素类",
+          "调整剂量",
+          "咨询医生"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "易善复与双香豆素类药物合用完全不受影响",
+          "易善复已证实与其他药物绝无相互作用"
+        ]
+      },
+      {
+        "category": "applicable_scene",
+        "fact": "易善复适用于已诊断脂肪肝或伴有食欲不振、右上腹不适等表现的相关人群进行辅助改善。",
+        "keywords": [
+          "脂肪肝人群",
+          "食欲不振",
+          "右上腹不适",
+          "辅助改善"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "脂肪肝人群不适合使用易善复",
+          "易善复只适合没有任何症状的人"
+        ]
+      },
+      {
+        "category": "applicable_scene",
+        "fact": "长期饮酒、长期服药、饮食油腻、肥胖、缺乏运动或体检发现ALT/AST轻度异常的人群，可作为易善复的相关使用场景参考，但仍应结合医生评估。",
+        "keywords": [
+          "长期饮酒",
+          "长期服药",
+          "油腻饮食",
+          "肥胖",
+          "缺乏运动",
+          "ALT",
+          "AST"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "只要熬夜就必须吃易善复",
+          "任何转氨酶异常都可以不经评估直接长期服用易善复"
+        ]
+      },
+      {
+        "category": "efficacy",
+        "fact": "对于脂肪肝场景，易善复更准确的表述是用于脂肪肝相关问题的辅助改善，而非直接根治脂肪肝。",
+        "keywords": [
+          "脂肪肝",
+          "辅助改善",
+          "不是根治"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "易善复可以根治脂肪肝",
+          "易善复对脂肪肝完全没有作用"
+        ]
+      },
+      {
+        "category": "differentiation",
+        "fact": "关于“辅助稳糖降脂”“可安全长期服用7年”等内容属于市场卖点口径，正式对外表达应优先依据说明书适应症和循证资料。",
+        "keywords": [
+          "稳糖降脂",
+          "长期服用7年",
+          "市场口径",
+          "说明书",
+          "循证"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "易善复说明书明确写有稳糖降脂适应症",
+          "易善复说明书明确建议可自行连续服用7年"
+        ]
+      },
+      {
+        "category": "basic_info",
+        "fact": "易善复为不透明硬胶囊，内容物为黄色黏稠物，规格为228毫克/粒。",
+        "keywords": [
+          "性状",
+          "硬胶囊",
+          "黄色黏稠物",
+          "228毫克/粒"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": [
+          "易善复是片剂",
+          "易善复内容物为白色粉末"
+        ]
+      },
+      {
+        "category": "basic_info",
+        "fact": "易善复应在25℃以下干燥处保存，有效期为18个月。",
+        "keywords": [
+          "贮藏",
+          "25℃以下",
+          "干燥处",
+          "有效期18个月"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": [
+          "易善复需要冷冻保存",
+          "易善复有效期无限制"
+        ]
+      },
+      {
+        "category": "basic_info",
+        "fact": "易善复常见包装规格包括每盒24粒、36粒、48粒和96粒。",
+        "keywords": [
+          "包装",
+          "24粒",
+          "36粒",
+          "48粒",
+          "96粒"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": [
+          "易善复只有一种包装规格"
+        ]
+      },
+      {
+        "category": "basic_info",
+        "fact": "易善复的批准文号为国药准字H20059010，上市许可持有人和生产企业为赛诺菲（北京）制药有限公司。",
+        "keywords": [
+          "批准文号",
+          "国药准字H20059010",
+          "赛诺菲",
+          "生产企业"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": [
+          "易善复没有国药准字",
+          "易善复不是赛诺菲生产"
+        ]
+      }
+    ],
+    "fact_count": 38
+  },
+  "澳诺": {
+    "product_name": "澳诺",
+    "facts": [
+      {
+        "category": "basic_info",
+        "fact": "澳诺所指产品的通用名称为葡萄糖酸钙锌口服溶液，常用名称为999澳诺葡萄糖酸钙锌口服溶液。",
+        "keywords": [
+          "澳诺",
+          "999澳诺",
+          "葡萄糖酸钙锌口服溶液",
+          "通用名称",
+          "常用名称"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "澳诺是单一补钙药",
+          "澳诺只有锌没有钙"
+        ]
+      },
+      {
+        "category": "basic_info",
+        "fact": "999澳诺葡萄糖酸钙锌口服溶液的英文名称为Calcium and Zinc Gluconates Oral Solution。",
+        "keywords": [
+          "英文名称",
+          "Calcium and Zinc Gluconates Oral Solution"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": []
+      },
+      {
+        "category": "mechanism",
+        "fact": "999澳诺葡萄糖酸钙锌口服溶液定位为钙锌同补的复方营养性药品。",
+        "keywords": [
+          "定位",
+          "钙锌同补",
+          "复方营养性药品"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "澳诺只是普通保健饮料",
+          "澳诺只能补钙不能补锌"
+        ]
+      },
+      {
+        "category": "ingredients",
+        "fact": "每10毫升999澳诺葡萄糖酸钙锌口服溶液含葡萄糖酸钙600毫克，相当于元素钙54毫克。",
+        "keywords": [
+          "成分",
+          "葡萄糖酸钙",
+          "元素钙",
+          "每10毫升",
+          "54毫克"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "每10毫升含600毫克元素钙",
+          "澳诺的钙成分是碳酸钙"
+        ]
+      },
+      {
+        "category": "ingredients",
+        "fact": "每10毫升999澳诺葡萄糖酸钙锌口服溶液含葡萄糖酸锌30毫克，相当于锌4.3毫克。",
+        "keywords": [
+          "成分",
+          "葡萄糖酸锌",
+          "锌",
+          "每10毫升",
+          "4.3毫克"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "每10毫升含30毫克元素锌",
+          "澳诺不含锌"
+        ]
+      },
+      {
+        "category": "ingredients",
+        "fact": "每10毫升999澳诺葡萄糖酸钙锌口服溶液含盐酸赖氨酸100毫克。",
+        "keywords": [
+          "成分",
+          "盐酸赖氨酸",
+          "每10毫升",
+          "100毫克"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "澳诺不含赖氨酸",
+          "赖氨酸是辅料不是有效成分"
+        ]
+      },
+      {
+        "category": "ingredients",
+        "fact": "999澳诺葡萄糖酸钙锌口服溶液的辅料包括L-乳酸、苯甲酸钠、三氯蔗糖、安赛蜜、香精和纯化水。",
+        "keywords": [
+          "辅料",
+          "L-乳酸",
+          "苯甲酸钠",
+          "三氯蔗糖",
+          "安赛蜜",
+          "香精",
+          "纯化水"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "本品完全不含甜味辅料",
+          "本品没有任何防腐相关辅料"
+        ]
+      },
+      {
+        "category": "efficacy",
+        "fact": "999澳诺葡萄糖酸钙锌口服溶液用于治疗因缺钙、缺锌引起的疾病。",
+        "keywords": [
+          "功效",
+          "作用",
+          "缺钙",
+          "缺锌",
+          "治疗"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "澳诺可以治疗所有发育问题",
+          "澳诺与缺钙缺锌无关"
+        ]
+      },
+      {
+        "category": "efficacy",
+        "fact": "999澳诺葡萄糖酸钙锌口服溶液可用于因缺钙、缺锌引起的骨质疏松、手足抽搐症、骨发育不全和佝偻病。",
+        "keywords": [
+          "适应症",
+          "骨质疏松",
+          "手足抽搐症",
+          "骨发育不全",
+          "佝偻病"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "澳诺不能用于缺钙相关骨骼问题",
+          "澳诺专门治疗骨折"
+        ]
+      },
+      {
+        "category": "efficacy",
+        "fact": "999澳诺葡萄糖酸钙锌口服溶液可用于妊娠妇女、哺乳期妇女以及绝经期妇女的钙补充。",
+        "keywords": [
+          "适应症",
+          "妊娠妇女",
+          "哺乳期妇女",
+          "绝经期妇女",
+          "钙补充"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "孕妇绝对不能用澳诺",
+          "澳诺只适合儿童不能用于女性补钙"
+        ]
+      },
+      {
+        "category": "efficacy",
+        "fact": "999澳诺葡萄糖酸钙锌口服溶液可用于小儿生长发育迟缓、食欲缺乏、厌食症、复发性口腔溃疡和痤疮等缺钙缺锌相关情况。",
+        "keywords": [
+          "适应症",
+          "小儿生长发育迟缓",
+          "食欲缺乏",
+          "厌食症",
+          "复发性口腔溃疡",
+          "痤疮"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "澳诺只补钙不涉及食欲差",
+          "澳诺可以直接治疗所有口腔溃疡和痤疮"
+        ]
+      },
+      {
+        "category": "applicable_scene",
+        "fact": "999澳诺葡萄糖酸钙锌口服溶液既可用于日常补充钙锌，也可用于出现缺钙、缺锌相关问题时服用。",
+        "keywords": [
+          "日常补充",
+          "缺钙缺锌",
+          "服用场景",
+          "营养补充"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "澳诺只能有病时吃",
+          "澳诺只能日常保健不能用于缺乏相关问题"
+        ]
+      },
+      {
+        "category": "applicable_scene",
+        "fact": "999澳诺葡萄糖酸钙锌口服溶液常见适用场景包括儿童生长发育期补钙补锌、挑食饮食不均衡以及有营养补充需求的人群。",
+        "keywords": [
+          "适用人群",
+          "儿童",
+          "生长发育期",
+          "挑食",
+          "饮食不均衡",
+          "营养补充"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "澳诺只适合老年人",
+          "挑食儿童不适合补钙锌"
+        ]
+      },
+      {
+        "category": "applicable_scene",
+        "fact": "消费者常在身高偏矮、体重偏轻、长牙慢、发育慢、生长痛、抽筋、胃口差等怀疑缺钙缺锌的场景下关注或使用本品。",
+        "keywords": [
+          "身高偏矮",
+          "体重偏轻",
+          "长牙慢",
+          "发育慢",
+          "生长痛",
+          "抽筋",
+          "胃口差"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "只要长不高就一定适合吃澳诺",
+          "抽筋一定是澳诺的适应症且无需判断原因"
+        ]
+      },
+      {
+        "category": "mechanism",
+        "fact": "999澳诺葡萄糖酸钙锌口服溶液不是单一补钙产品，而是同时补充钙和锌。",
+        "keywords": [
+          "钙锌同补",
+          "不是单一补钙",
+          "补锌"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "澳诺只是补钙口服液",
+          "澳诺不补锌"
+        ]
+      },
+      {
+        "category": "mechanism",
+        "fact": "产品资料指出锌在骨钙化过程中有重要作用，可促进骨碱性磷酸酶活性，从而帮助钙更有效沉积在骨骼中并促进骨骼生长。",
+        "keywords": [
+          "锌",
+          "骨钙化",
+          "骨碱性磷酸酶",
+          "钙沉积",
+          "骨骼生长"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "锌与骨骼生长无关",
+          "补锌不会影响钙利用"
+        ]
+      },
+      {
+        "category": "mechanism",
+        "fact": "999澳诺葡萄糖酸钙锌口服溶液采用液体离子剂型，产品资料强调其可使钙、锌保持较高游离状态并提高生物利用度。",
+        "keywords": [
+          "液体离子剂型",
+          "游离状态",
+          "生物利用度",
+          "吸收"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "澳诺是普通片剂",
+          "液体剂型与吸收没有区别"
+        ]
+      },
+      {
+        "category": "differentiation",
+        "fact": "与碳酸钙类产品相比，999澳诺所含葡萄糖酸钙属于有机钙，资料中强调其易溶、易解离且更容易吸收。",
+        "keywords": [
+          "对比",
+          "碳酸钙",
+          "葡萄糖酸钙",
+          "有机钙",
+          "易吸收"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "澳诺的钙就是碳酸钙",
+          "葡萄糖酸钙一定比所有钙剂含钙量更高"
+        ]
+      },
+      {
+        "category": "mechanism",
+        "fact": "产品资料指出赖氨酸可与钙、锌离子形成鳌合物，减少沉淀，并增加小肠黏膜钙转运蛋白含量，从而促进钙锌吸收与利用。",
+        "keywords": [
+          "赖氨酸",
+          "鳌合物",
+          "减少沉淀",
+          "钙转运蛋白",
+          "促进吸收"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "赖氨酸只是调味成分",
+          "赖氨酸与钙锌吸收无关"
+        ]
+      },
+      {
+        "category": "mechanism",
+        "fact": "999澳诺葡萄糖酸钙锌口服溶液的产品特点强调高解离率、高吸收率和高利用率。",
+        "keywords": [
+          "高解离率",
+          "高吸收率",
+          "高利用率",
+          "产品特点"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": [
+          "本品只强调补进去不强调吸收利用"
+        ]
+      },
+      {
+        "category": "usage",
+        "fact": "999澳诺葡萄糖酸钙锌口服溶液说明书推荐婴幼儿一日服用5至10毫升。",
+        "keywords": [
+          "用法用量",
+          "婴幼儿",
+          "一日5-10毫升"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "婴幼儿固定每天20毫升",
+          "婴幼儿不能服用澳诺"
+        ]
+      },
+      {
+        "category": "usage",
+        "fact": "999澳诺葡萄糖酸钙锌口服溶液说明书推荐成人一日服用20至30毫升，分2至3次，饭后服用。",
+        "keywords": [
+          "用法用量",
+          "成人",
+          "20-30毫升",
+          "分2-3次",
+          "饭后服"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "成人一次喝完30毫升即可",
+          "本品必须空腹服用"
+        ]
+      },
+      {
+        "category": "usage",
+        "fact": "产品资料提到999澳诺葡萄糖酸钙锌口服溶液可按疗程服用，30天为一个疗程，3个疗程为一个周期。",
+        "keywords": [
+          "疗程",
+          "30天一个疗程",
+          "3个疗程一个周期"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": [
+          "澳诺只能吃几天",
+          "澳诺必须长期无限期服用"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "999澳诺葡萄糖酸钙锌口服溶液可见轻度恶心、呕吐、便秘等不良反应。",
+        "keywords": [
+          "不良反应",
+          "恶心",
+          "呕吐",
+          "便秘"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "澳诺完全没有不良反应",
+          "澳诺最常见不良反应是严重腹泻"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "长期服用999澳诺葡萄糖酸钙锌口服溶液可引起反跳性胃酸分泌增高。",
+        "keywords": [
+          "长期服用",
+          "反跳性胃酸分泌增高",
+          "不良反应"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "长期服用绝对不会影响胃酸分泌"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "血钙过高者和血锌过高者禁用999澳诺葡萄糖酸钙锌口服溶液。",
+        "keywords": [
+          "禁忌",
+          "血钙过高",
+          "血锌过高",
+          "禁用"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "高钙血症也可以补澳诺",
+          "高锌者补澳诺更合适"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "甲状旁腺功能亢进患者禁用999澳诺葡萄糖酸钙锌口服溶液。",
+        "keywords": [
+          "禁忌",
+          "甲状旁腺功能亢进",
+          "禁用"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "甲状旁腺功能亢进可以随意服用澳诺"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "对999澳诺葡萄糖酸钙锌口服溶液过敏者禁用本品。",
+        "keywords": [
+          "过敏",
+          "禁用",
+          "对本品过敏"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "过敏体质和过敏者都可以放心用"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "肾功能不全患者或糖尿病患者应慎用999澳诺葡萄糖酸钙锌口服溶液。",
+        "keywords": [
+          "慎用",
+          "肾功能不全",
+          "糖尿病"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "糖尿病患者一定可以随意服用",
+          "肾功能不全不需要注意"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "过敏体质者应慎用999澳诺葡萄糖酸钙锌口服溶液。",
+        "keywords": [
+          "过敏体质",
+          "慎用"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "过敏体质者无需任何注意"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "999澳诺葡萄糖酸钙锌口服溶液性状发生改变时禁止使用。",
+        "keywords": [
+          "性状改变",
+          "禁止使用"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "外观变化后仍可继续服用"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "999澳诺葡萄糖酸钙锌口服溶液应放在儿童不能接触的地方，儿童必须在成人监护下使用。",
+        "keywords": [
+          "儿童不能接触",
+          "成人监护",
+          "儿童使用"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "儿童可以自行随意服用",
+          "本品不需要监护"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "如正在使用其他药品，使用999澳诺葡萄糖酸钙锌口服溶液前应咨询医师或药师。",
+        "keywords": [
+          "其他药品",
+          "咨询医师",
+          "咨询药师",
+          "联合用药"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "澳诺与任何药都能一起吃",
+          "联合用药不需要咨询"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "999澳诺葡萄糖酸钙锌口服溶液不宜与洋地黄类药物合用。",
+        "keywords": [
+          "药物相互作用",
+          "洋地黄类",
+          "不宜合用"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "澳诺可以和洋地黄类随意同用"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "999澳诺葡萄糖酸钙锌口服溶液不要与四环素、青霉胺、苯妥英钠以及磷酸盐同用。",
+        "keywords": [
+          "药物相互作用",
+          "四环素",
+          "青霉胺",
+          "苯妥英钠",
+          "磷酸盐",
+          "同用"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "澳诺和四环素一起吃没影响",
+          "澳诺与苯妥英钠同用完全安全"
+        ]
+      },
+      {
+        "category": "differentiation",
+        "fact": "999澳诺葡萄糖酸钙锌口服溶液的区别点之一是同时含有葡萄糖酸钙、葡萄糖酸锌和盐酸赖氨酸，兼顾补充与促进吸收。",
+        "keywords": [
+          "区别点",
+          "葡萄糖酸钙",
+          "葡萄糖酸锌",
+          "盐酸赖氨酸",
+          "补充",
+          "促进吸收"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "澳诺和普通单一钙剂没有区别",
+          "澳诺不含促进吸收的配方"
+        ]
+      },
+      {
+        "category": "differentiation",
+        "fact": "999澳诺葡萄糖酸钙锌口服溶液为液体口服溶液剂型，资料中强调其相对更方便儿童服用。",
+        "keywords": [
+          "液体剂型",
+          "口服溶液",
+          "儿童服用方便"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "澳诺是咀嚼片",
+          "澳诺只能吞片服用"
+        ]
+      },
+      {
+        "category": "basic_info",
+        "fact": "999澳诺葡萄糖酸钙锌口服溶液规格为10毫升每支。",
+        "keywords": [
+          "规格",
+          "10毫升每支",
+          "10mL/支"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": [
+          "本品标准规格是100毫升每支"
+        ]
+      },
+      {
+        "category": "basic_info",
+        "fact": "产品资料中提到999澳诺葡萄糖酸钙锌口服溶液常见包装规格包括10毫升×24支和15毫升×33袋。",
+        "keywords": [
+          "包装规格",
+          "10mL×24支",
+          "15mL×33袋"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": []
+      },
+      {
+        "category": "basic_info",
+        "fact": "贮藏条件为密封并置于干燥处保存，有效期为24个月。",
+        "keywords": [
+          "贮藏",
+          "密封",
+          "干燥处保存",
+          "有效期",
+          "24个月"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": [
+          "本品需要冷藏",
+          "本品没有有效期限制"
+        ]
+      },
+      {
+        "category": "basic_info",
+        "fact": "999澳诺葡萄糖酸钙锌口服溶液的批准文号为国药准字H20013241。",
+        "keywords": [
+          "批准文号",
+          "国药准字H20013241"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": []
+      },
+      {
+        "category": "basic_info",
+        "fact": "999澳诺葡萄糖酸钙锌口服溶液的上市许可持有人和生产企业均为澳诺（中国）制药有限公司。",
+        "keywords": [
+          "上市许可持有人",
+          "生产企业",
+          "澳诺中国制药有限公司"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": []
+      }
+    ],
+    "fact_count": 42
+  },
+  "皮炎平": {
+    "product_name": "皮炎平",
+    "facts": [
+      {
+        "category": "basic_info",
+        "fact": "999皮炎平是皮肤科常用的外用糖皮质激素类药物系列，主要包括绿皮糠酸莫米松凝胶和红皮复方醋酸地塞米松乳膏。",
+        "keywords": [
+          "999皮炎平",
+          "绿皮",
+          "红皮",
+          "外用糖皮质激素",
+          "系列产品"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "999皮炎平只有一种产品",
+          "999皮炎平都属于同一个通用名"
+        ]
+      },
+      {
+        "category": "basic_info",
+        "fact": "999皮炎平绿皮的通用名称是糠酸莫米松凝胶。",
+        "keywords": [
+          "绿皮",
+          "糠酸莫米松凝胶",
+          "通用名"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "999皮炎平绿皮是复方醋酸地塞米松乳膏",
+          "绿皮不含激素"
+        ]
+      },
+      {
+        "category": "basic_info",
+        "fact": "999皮炎平红皮的通用名称是复方醋酸地塞米松乳膏。",
+        "keywords": [
+          "红皮",
+          "复方醋酸地塞米松乳膏",
+          "通用名"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "999皮炎平红皮是糠酸莫米松凝胶",
+          "红皮只是普通止痒膏不含激素"
+        ]
+      },
+      {
+        "category": "mechanism",
+        "fact": "999皮炎平绿皮和红皮都属于外用激素类药物，不建议长期、大面积、随意连续使用。",
+        "keywords": [
+          "外用激素",
+          "长期使用",
+          "大面积使用",
+          "连续使用"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "皮炎平可以长期随便涂",
+          "皮炎平不是激素药所以可以一直用"
+        ]
+      },
+      {
+        "category": "efficacy",
+        "fact": "999皮炎平系列主要用于缓解湿疹、皮炎、瘙痒等炎症性皮肤问题。",
+        "keywords": [
+          "湿疹",
+          "皮炎",
+          "瘙痒",
+          "炎症性皮肤问题",
+          "缓解"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "皮炎平主要用于治疗细菌感染",
+          "皮炎平是抗生素软膏"
+        ]
+      },
+      {
+        "category": "efficacy",
+        "fact": "999皮炎平绿皮用于湿疹、神经性皮炎、异位性皮炎和皮肤瘙痒症。",
+        "keywords": [
+          "绿皮适应症",
+          "湿疹",
+          "神经性皮炎",
+          "异位性皮炎",
+          "皮肤瘙痒症"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "绿皮主要用于病毒性皮肤病",
+          "绿皮适用于所有皮肤病"
+        ]
+      },
+      {
+        "category": "efficacy",
+        "fact": "999皮炎平红皮用于局限性瘙痒症、神经性皮炎、接触性皮炎、脂溢性皮炎和慢性湿疹。",
+        "keywords": [
+          "红皮适应症",
+          "局限性瘙痒症",
+          "神经性皮炎",
+          "接触性皮炎",
+          "脂溢性皮炎",
+          "慢性湿疹"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "红皮适合所有湿疹类型",
+          "红皮主要治疗真菌感染"
+        ]
+      },
+      {
+        "category": "mechanism",
+        "fact": "999皮炎平绿皮作为局部外用糖皮质激素，具有抗炎、抗过敏、止痒和减少渗出的作用。",
+        "keywords": [
+          "绿皮作用",
+          "抗炎",
+          "抗过敏",
+          "止痒",
+          "减少渗出"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "绿皮只有止痒作用没有抗炎作用",
+          "绿皮是抗菌药"
+        ]
+      },
+      {
+        "category": "mechanism",
+        "fact": "999皮炎平红皮中醋酸地塞米松具有抗炎、抗过敏作用，薄荷脑和樟脑具有促进局部循环、轻度消炎、止痛和止痒作用。",
+        "keywords": [
+          "红皮作用",
+          "醋酸地塞米松",
+          "薄荷脑",
+          "樟脑",
+          "抗炎",
+          "抗过敏",
+          "止痒"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "红皮的止痒完全不靠成分作用",
+          "红皮不含复方成分"
+        ]
+      },
+      {
+        "category": "ingredients",
+        "fact": "999皮炎平绿皮每克含糠酸莫米松1毫克，规格为0.1%。",
+        "keywords": [
+          "绿皮成分",
+          "糠酸莫米松",
+          "1毫克每克",
+          "0.1%"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "绿皮主要成分是地塞米松",
+          "绿皮不含糠酸莫米松"
+        ]
+      },
+      {
+        "category": "ingredients",
+        "fact": "999皮炎平红皮每克含醋酸地塞米松0.75毫克、薄荷脑10毫克和樟脑10毫克。",
+        "keywords": [
+          "红皮成分",
+          "醋酸地塞米松",
+          "薄荷脑",
+          "樟脑",
+          "0.75毫克每克"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "红皮只有地塞米松一种成分",
+          "红皮不含薄荷脑和樟脑"
+        ]
+      },
+      {
+        "category": "usage",
+        "fact": "999皮炎平绿皮为局部外用，取适量涂于患处，每日1次。",
+        "keywords": [
+          "绿皮用法",
+          "局部外用",
+          "每日1次",
+          "涂于患处"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "绿皮需要一天涂很多次",
+          "绿皮可以口服"
+        ]
+      },
+      {
+        "category": "usage",
+        "fact": "999皮炎平红皮为外用，一日1至2次，取少量涂于患处并轻揉片刻。",
+        "keywords": [
+          "红皮用法",
+          "外用",
+          "一日1到2次",
+          "轻揉片刻"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "红皮一天只能用一次",
+          "红皮可以用于口服或注射"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "999皮炎平绿皮对本品任何成分过敏者禁用。",
+        "keywords": [
+          "绿皮禁忌",
+          "过敏禁用",
+          "成分过敏"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "对绿皮过敏也可以继续用",
+          "绿皮没有禁忌"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "999皮炎平红皮在患处已破溃、化脓或有明显渗出时禁用。",
+        "keywords": [
+          "红皮禁忌",
+          "破溃",
+          "化脓",
+          "明显渗出",
+          "禁用"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "红皮可以涂在破皮流脓处",
+          "红皮越渗出越适合用"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "999皮炎平红皮对病毒感染性皮肤病患者禁用，如疱疹、水痘。",
+        "keywords": [
+          "红皮禁忌",
+          "病毒感染",
+          "疱疹",
+          "水痘",
+          "禁用"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "红皮可以治疗疱疹",
+          "红皮适合水痘皮疹止痒"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "999皮炎平绿皮不得用于皮肤破溃处，并应避免接触眼睛和口鼻等黏膜。",
+        "keywords": [
+          "绿皮注意事项",
+          "皮肤破溃",
+          "眼睛",
+          "黏膜",
+          "口鼻"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "绿皮可以直接涂在破溃伤口上",
+          "绿皮可以随便涂眼周和口鼻黏膜"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "999皮炎平红皮应避免接触眼睛和口鼻等黏膜，且不宜大面积、长期使用。",
+        "keywords": [
+          "红皮注意事项",
+          "眼睛",
+          "黏膜",
+          "大面积使用",
+          "长期使用"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "红皮可以长期大面积涂抹",
+          "红皮可以用于眼周黏膜"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "999皮炎平绿皮孕妇及哺乳期妇女慎用，婴幼儿、儿童和皮肤萎缩的老年人使用时应谨慎。",
+        "keywords": [
+          "绿皮慎用人群",
+          "孕妇",
+          "哺乳期",
+          "婴幼儿",
+          "儿童",
+          "老年人"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "绿皮孕妇可以随便用",
+          "绿皮对婴幼儿和老人没有特殊风险"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "999皮炎平红皮孕妇和哺乳期妇女慎用，小儿应避免使用。",
+        "keywords": [
+          "红皮慎用人群",
+          "孕妇",
+          "哺乳期",
+          "小儿避免使用"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "红皮婴幼儿可以常规使用",
+          "红皮孕妇哺乳期可随意使用"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "999皮炎平绿皮用药7日后症状未缓解应咨询医师或药师。",
+        "keywords": [
+          "绿皮疗程提醒",
+          "7日未缓解",
+          "咨询医师",
+          "咨询药师"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "绿皮用了7天没效果也可以继续自己长期用",
+          "绿皮必须连续用一个月才判断效果"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "999皮炎平红皮用药1周后症状未缓解应咨询医师。",
+        "keywords": [
+          "红皮疗程提醒",
+          "1周未缓解",
+          "咨询医师"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "红皮一周没效果也应继续自行使用",
+          "红皮必须长期坚持才有用"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "使用999皮炎平绿皮或红皮后如局部出现烧灼感、红肿等情况，应停药并洗净局部，必要时咨询医师。",
+        "keywords": [
+          "不适处理",
+          "烧灼感",
+          "红肿",
+          "停药",
+          "洗净局部"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "涂后越烧越说明有效应继续用",
+          "出现红肿刺激感不用处理"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "如皮损并发细菌或真菌感染，使用999皮炎平前应咨询医师处理。",
+        "keywords": [
+          "感染",
+          "细菌感染",
+          "真菌感染",
+          "咨询医师"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "有细菌或真菌感染时单用皮炎平就够了",
+          "皮炎平本身就是抗真菌药"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "999皮炎平绿皮可能引起局部灼热感、瘙痒刺痛、皮肤萎缩等不良反应，长期大量使用还可能出现多毛症、口周围皮炎、继发感染和皮肤条纹状色素沉着等。",
+        "keywords": [
+          "绿皮不良反应",
+          "灼热感",
+          "刺痛",
+          "皮肤萎缩",
+          "多毛症",
+          "口周围皮炎",
+          "继发感染"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "绿皮完全没有副作用",
+          "绿皮长期大量使用也不会有皮肤问题"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "999皮炎平红皮长期使用可能导致皮肤萎缩、毛细血管扩张、色素沉着和继发感染，偶见过敏反应。",
+        "keywords": [
+          "红皮不良反应",
+          "皮肤萎缩",
+          "毛细血管扩张",
+          "色素沉着",
+          "继发感染",
+          "过敏反应"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "红皮长期使用没有风险",
+          "红皮不会引起皮肤变薄或色素变化"
+        ]
+      },
+      {
+        "category": "differentiation",
+        "fact": "999皮炎平绿皮是凝胶剂型，肤感更清爽、不油腻、吸收较快；红皮是乳膏剂型，保湿和封闭性更强。",
+        "keywords": [
+          "绿皮红皮区别",
+          "凝胶",
+          "乳膏",
+          "清爽",
+          "保湿",
+          "封闭性"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "绿皮和红皮只是包装颜色不同",
+          "绿皮和红皮剂型完全一样"
+        ]
+      },
+      {
+        "category": "differentiation",
+        "fact": "999皮炎平绿皮通常归为强效外用糖皮质激素，红皮通常归为中效外用糖皮质激素。",
+        "keywords": [
+          "激素强度",
+          "绿皮强效",
+          "红皮中效",
+          "外用糖皮质激素"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "红皮激素强度比绿皮更高",
+          "绿皮和红皮激素强度完全相同"
+        ]
+      },
+      {
+        "category": "applicable_scene",
+        "fact": "999皮炎平绿皮更适合偏油、渗出不多、希望肤感清爽的使用场景。",
+        "keywords": [
+          "绿皮适用场景",
+          "偏油",
+          "渗出不多",
+          "清爽肤感"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "绿皮更适合特别干燥需要封闭保湿的皮肤",
+          "绿皮一定适合所有慢性干燥皮炎"
+        ]
+      },
+      {
+        "category": "applicable_scene",
+        "fact": "999皮炎平红皮更适合偏干、慢性反复、需要更强保湿和封闭感的局部皮肤炎症场景。",
+        "keywords": [
+          "红皮适用场景",
+          "偏干",
+          "慢性反复",
+          "保湿",
+          "封闭感"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "红皮更适合油性皮肤追求清爽的人群",
+          "红皮不适合慢性干燥类皮炎"
+        ]
+      },
+      {
+        "category": "differentiation",
+        "fact": "999皮炎平绿皮更常用于湿疹、异位性皮炎、神经性皮炎和皮肤瘙痒症，红皮更常用于局限性瘙痒症、接触性皮炎、脂溢性皮炎和慢性湿疹。",
+        "keywords": [
+          "绿皮红皮怎么选",
+          "湿疹",
+          "异位性皮炎",
+          "接触性皮炎",
+          "脂溢性皮炎",
+          "慢性湿疹"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "绿皮和红皮适应症完全一样无需区分",
+          "红皮比绿皮更适合异位性皮炎是固定规则"
+        ]
+      },
+      {
+        "category": "mechanism",
+        "fact": "999皮炎平红皮因含薄荷脑和樟脑，除抗炎抗过敏外还具有一定清凉止痒感。",
+        "keywords": [
+          "红皮特点",
+          "薄荷脑",
+          "樟脑",
+          "清凉止痒"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "红皮没有清凉感来源",
+          "红皮的止痒与薄荷脑樟脑无关"
+        ]
+      },
+      {
+        "category": "basic_info",
+        "fact": "999皮炎平绿皮为皮肤科用药类非处方药，性状为乳白色半透明状凝胶。",
+        "keywords": [
+          "绿皮",
+          "非处方药",
+          "性状",
+          "乳白色半透明状凝胶"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": []
+      },
+      {
+        "category": "basic_info",
+        "fact": "999皮炎平红皮为皮肤科用药类非处方药，性状为白色乳膏并有樟脑的特异芳香。",
+        "keywords": [
+          "红皮",
+          "非处方药",
+          "性状",
+          "白色乳膏",
+          "樟脑芳香"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": []
+      },
+      {
+        "category": "basic_info",
+        "fact": "999皮炎平绿皮常见包装规格包括10克、12克和15克，需在25℃以下密闭保存，有效期36个月。",
+        "keywords": [
+          "绿皮规格",
+          "10g",
+          "12g",
+          "15g",
+          "25℃以下",
+          "有效期36个月"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": []
+      },
+      {
+        "category": "basic_info",
+        "fact": "999皮炎平红皮常见包装为每支20克、每盒1支，需密封并在阴凉处保存，有效期36个月。",
+        "keywords": [
+          "红皮规格",
+          "20g",
+          "阴凉处保存",
+          "有效期36个月"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": []
+      },
+      {
+        "category": "basic_info",
+        "fact": "999皮炎平绿皮批准文号为国药准字H20080010，生产企业为华润三九（南昌）药业有限公司。",
+        "keywords": [
+          "绿皮批准文号",
+          "国药准字H20080010",
+          "华润三九南昌"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": []
+      },
+      {
+        "category": "basic_info",
+        "fact": "999皮炎平红皮批准文号为国药准字H44024170，生产企业为华润三九医药股份有限公司。",
+        "keywords": [
+          "红皮批准文号",
+          "国药准字H44024170",
+          "华润三九医药"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": []
+      }
+    ],
+    "fact_count": 38
+  },
+  "胃泰": {
+    "product_name": "胃泰",
+    "facts": [
+      {
+        "category": "basic_info",
+        "fact": "该产品的通用名称为养胃舒颗粒，属于三九胃泰家族产品。",
+        "keywords": [
+          "养胃舒颗粒",
+          "通用名称",
+          "三九胃泰家族",
+          "品牌体系"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "胃泰就是三九胃泰",
+          "该产品通用名是胃泰"
+        ]
+      },
+      {
+        "category": "efficacy",
+        "fact": "养胃舒颗粒的说明书功能主治为滋阴养胃，用于慢性胃炎及胃脘灼热、隐隐作痛。",
+        "keywords": [
+          "滋阴养胃",
+          "慢性胃炎",
+          "胃脘灼热",
+          "隐隐作痛",
+          "功能主治"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "养胃舒颗粒主要是清热泻火",
+          "养胃舒颗粒只用于急性胃痛",
+          "养胃舒颗粒不用于慢性胃炎"
+        ]
+      },
+      {
+        "category": "efficacy",
+        "fact": "养胃舒颗粒常用于胃痛、胃灼热、反酸、胃胀、恶心、打嗝、消化不良以及餐后饱胀、早饱、胀气、嗳气、呕吐等胃部不适场景。",
+        "keywords": [
+          "胃痛",
+          "胃灼热",
+          "反酸",
+          "胃胀",
+          "恶心",
+          "打嗝",
+          "消化不良",
+          "餐后饱胀",
+          "早饱",
+          "嗳气",
+          "呕吐"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "养胃舒颗粒只能缓解胃痛，不能用于反酸胃胀",
+          "养胃舒颗粒不适合消化不良伴随症状"
+        ]
+      },
+      {
+        "category": "applicable_scene",
+        "fact": "养胃舒颗粒更适合轻中度、偶发或反复发作的胃部不适，以及慢性胃炎或胃黏膜受损后的调理和养护。",
+        "keywords": [
+          "轻中度胃不适",
+          "偶发胃痛",
+          "反复发作",
+          "慢性胃炎调理",
+          "胃黏膜养护"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "所有胃痛都适合自行长期吃养胃舒颗粒",
+          "养胃舒颗粒只适合急性重度胃痛"
+        ]
+      },
+      {
+        "category": "ingredients",
+        "fact": "养胃舒颗粒的主要成分包括党参、陈皮、黄精（蒸）、山药、玄参、乌梅、山楂（炒）、北沙参、干姜、菟丝子和白术（炒）。",
+        "keywords": [
+          "党参",
+          "陈皮",
+          "黄精",
+          "山药",
+          "玄参",
+          "乌梅",
+          "山楂",
+          "北沙参",
+          "干姜",
+          "菟丝子",
+          "白术",
+          "主要成分"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "养胃舒颗粒主要成分是西药抑酸剂",
+          "养胃舒颗粒不含党参和山药",
+          "养胃舒颗粒成分与三九胃泰完全相同"
+        ]
+      },
+      {
+        "category": "ingredients",
+        "fact": "养胃舒颗粒的辅料为糊精和蔗糖。",
+        "keywords": [
+          "辅料",
+          "糊精",
+          "蔗糖"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "养胃舒颗粒不含糖分相关辅料",
+          "养胃舒颗粒辅料完全不含蔗糖"
+        ]
+      },
+      {
+        "category": "usage",
+        "fact": "养胃舒颗粒的用法用量为开水冲服，一次1至2袋，一日2次。",
+        "keywords": [
+          "开水冲服",
+          "一次1-2袋",
+          "一日2次",
+          "用法用量"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "养胃舒颗粒一天只需吃一次",
+          "养胃舒颗粒应空腹干吞",
+          "养胃舒颗粒每次固定必须2袋"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "养胃舒颗粒说明书中不良反应尚不明确。",
+        "keywords": [
+          "不良反应",
+          "尚不明确"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "养胃舒颗粒说明书明确列出了常见不良反应",
+          "养胃舒颗粒绝对没有任何不良反应风险"
+        ]
+      },
+      {
+        "category": "contraindication",
+        "fact": "养胃舒颗粒说明书中禁忌尚不明确，但对本品过敏者禁用。",
+        "keywords": [
+          "禁忌",
+          "尚不明确",
+          "过敏者禁用"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "养胃舒颗粒完全没有任何禁用情况",
+          "对本品过敏者也可以服用"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "孕妇应慎用养胃舒颗粒。",
+        "keywords": [
+          "孕妇慎用",
+          "慎用人群"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "孕妇可以随意服用养胃舒颗粒",
+          "养胃舒颗粒对孕妇绝对安全无需咨询医生"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "湿热胃痛证及重度胃痛患者应在医师指导下服用养胃舒颗粒。",
+        "keywords": [
+          "湿热胃痛证",
+          "重度胃痛",
+          "医师指导"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "重度胃痛可以直接自行吃养胃舒颗粒",
+          "湿热胃痛证与养胃舒颗粒完全对证无需辨证"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "糖尿病患者、儿童及年老体虚者应在医师指导下服用养胃舒颗粒。",
+        "keywords": [
+          "糖尿病患者",
+          "儿童",
+          "年老体虚",
+          "医师指导"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "糖尿病患者可自行长期服用无需指导",
+          "儿童可以按成人方式随意服用"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "服用养胃舒颗粒3天症状未改善，应停止服用并去医院就诊。",
+        "keywords": [
+          "3天未改善",
+          "停止服用",
+          "就医"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "吃养胃舒颗粒没效果也可以一直拖着吃",
+          "症状3天不改善无需就医"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "过敏体质者应慎用养胃舒颗粒，本品性状发生改变时禁止使用。",
+        "keywords": [
+          "过敏体质慎用",
+          "性状改变禁用"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "药品颜色气味改变后仍可继续服用",
+          "过敏体质服用养胃舒颗粒无需注意"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "儿童使用养胃舒颗粒必须在成人监护下进行，并应放在儿童不能接触的地方。",
+        "keywords": [
+          "儿童监护",
+          "儿童不能接触",
+          "安全用药"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "儿童可以自行取用养胃舒颗粒",
+          "养胃舒颗粒无需特别注意儿童误服"
+        ]
+      },
+      {
+        "category": "caution",
+        "fact": "如正在使用其他药品，使用养胃舒颗粒前应咨询医师或药师，因为同时用药可能发生药物相互作用。",
+        "keywords": [
+          "其他药品",
+          "药物相互作用",
+          "咨询医师",
+          "咨询药师"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "养胃舒颗粒与任何药物同用都不会相互作用",
+          "联合用药前不需要咨询专业人士"
+        ]
+      },
+      {
+        "category": "mechanism",
+        "fact": "养胃舒颗粒的产品特点之一是滋阴养胃，兼顾症状改善与胃部养护。",
+        "keywords": [
+          "滋阴养胃",
+          "治胃养胃",
+          "症状改善",
+          "胃部养护"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "养胃舒颗粒只有止痛作用，没有养护作用",
+          "养胃舒颗粒只适合短期压症状"
+        ]
+      },
+      {
+        "category": "mechanism",
+        "fact": "资料中强调养胃舒颗粒具有保护和修护胃黏膜的特点，包括促进胃黏膜修复和增强胃黏膜防御能力。",
+        "keywords": [
+          "胃黏膜保护",
+          "胃黏膜修护",
+          "增强防御",
+          "修复"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "养胃舒颗粒对胃黏膜没有任何保护作用",
+          "养胃舒颗粒只能抑酸不能养护胃黏膜"
+        ]
+      },
+      {
+        "category": "mechanism",
+        "fact": "养胃舒颗粒整体药性较温和，更适合轻中度胃部不适、慢性胃炎长期调理及日常养胃场景。",
+        "keywords": [
+          "药性温和",
+          "轻中度胃不适",
+          "长期调理",
+          "日常养胃"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "养胃舒颗粒药性寒凉刺激大",
+          "养胃舒颗粒不适合长期调理"
+        ]
+      },
+      {
+        "category": "differentiation",
+        "fact": "与三九胃泰相比，养胃舒颗粒更偏向滋阴养胃、止痛消炎和养护，而三九胃泰更偏向清热、柔肝、活血止痛。",
+        "keywords": [
+          "养胃舒",
+          "三九胃泰",
+          "区别",
+          "滋阴养胃",
+          "清热止痛"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "养胃舒颗粒和三九胃泰功效完全一样",
+          "养胃舒颗粒主要是清热寒凉路线"
+        ]
+      },
+      {
+        "category": "differentiation",
+        "fact": "与三九胃泰相比，养胃舒颗粒药性更温和、适用面更广，更适合轻中度不适和中长期调理。",
+        "keywords": [
+          "药性温和",
+          "适用面广",
+          "轻中度",
+          "中长期调理",
+          "对比"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "养胃舒颗粒更适合中重度急性发作",
+          "三九胃泰比养胃舒更适合长期养胃调理"
+        ]
+      },
+      {
+        "category": "differentiation",
+        "fact": "三九胃泰更适合胃火重、症状明显、发作较急的人群，而养胃舒颗粒更适合慢性胃炎、胃部脆弱和反复不适、需要边治边养的人群。",
+        "keywords": [
+          "胃火重",
+          "急性发作",
+          "慢性胃炎",
+          "反复不适",
+          "边治边养"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "慢性反复胃不适首选一定是三九胃泰",
+          "养胃舒颗粒更适合胃火重急性胃痛"
+        ]
+      },
+      {
+        "category": "applicable_scene",
+        "fact": "养胃舒颗粒适用于慢性胃炎人群以及胃脘灼热、隐隐作痛的人群。",
+        "keywords": [
+          "慢性胃炎人群",
+          "胃脘灼热",
+          "隐隐作痛",
+          "适用人群"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "养胃舒颗粒不适合慢性胃炎人群",
+          "只有胃酸多的人才能用养胃舒颗粒"
+        ]
+      },
+      {
+        "category": "applicable_scene",
+        "fact": "养胃舒颗粒适合偶尔胃难受、反酸、胃胀，以及因油腻、辛辣、酒精、冰饮、咖啡等刺激导致胃不适的人群。",
+        "keywords": [
+          "偶尔胃难受",
+          "反酸",
+          "胃胀",
+          "饮食刺激",
+          "油腻",
+          "辛辣",
+          "酒精",
+          "冰饮",
+          "咖啡"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "饮食刺激后的胃不适不能考虑养胃舒颗粒",
+          "养胃舒颗粒只适合严重器质性胃病"
+        ]
+      },
+      {
+        "category": "applicable_scene",
+        "fact": "养胃舒颗粒适合作息不规律、长期情绪压力或长期服用刺激性药物后出现胃部不适，以及胃病反复发作需要长期养护的人群。",
+        "keywords": [
+          "作息不规律",
+          "情绪压力",
+          "刺激性药物",
+          "反复发作",
+          "长期养护"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "作息和压力导致的胃不适不适合养胃舒颗粒",
+          "反复胃病不需要养护调理"
+        ]
+      },
+      {
+        "category": "mechanism",
+        "fact": "资料提到养胃舒颗粒可与部分化学药胃药或幽门螺杆菌治疗方案联合使用，用于缓解症状、保护和修护胃黏膜及巩固治疗效果。",
+        "keywords": [
+          "联合用药",
+          "化药胃药",
+          "幽门螺杆菌",
+          "胃黏膜修护",
+          "巩固治疗"
+        ],
+        "importance": "important",
+        "wrong_claims": [
+          "养胃舒颗粒不能与西药胃药联用",
+          "养胃舒颗粒可以替代幽门螺杆菌标准治疗"
+        ]
+      },
+      {
+        "category": "differentiation",
+        "fact": "养胃舒颗粒不能等同于幽门螺杆菌根除药，其在相关场景中是作为联合治疗辅助使用，而非替代标准四联疗法。",
+        "keywords": [
+          "幽门螺杆菌",
+          "标准四联疗法",
+          "辅助治疗",
+          "不能替代"
+        ],
+        "importance": "critical",
+        "wrong_claims": [
+          "养胃舒颗粒单独就能根除幽门螺杆菌",
+          "有养胃舒颗粒就不需要四联疗法"
+        ]
+      },
+      {
+        "category": "basic_info",
+        "fact": "养胃舒颗粒为棕黄色至棕色颗粒，味酸、甜，常见规格为每袋5克，包装每盒装8袋。",
+        "keywords": [
+          "性状",
+          "棕黄色至棕色颗粒",
+          "味酸甜",
+          "5克",
+          "8袋"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": [
+          "养胃舒颗粒是片剂",
+          "养胃舒颗粒每袋10克为唯一规格"
+        ]
+      },
+      {
+        "category": "basic_info",
+        "fact": "养胃舒颗粒应密封贮藏，有效期为30个月。",
+        "keywords": [
+          "密封",
+          "贮藏",
+          "有效期30个月"
+        ],
+        "importance": "nice_to_have",
+        "wrong_claims": [
+          "养胃舒颗粒需要冷藏保存",
+          "养胃舒颗粒有效期只有12个月"
+        ]
+      }
+    ],
+    "fact_count": 29
+  }
+}

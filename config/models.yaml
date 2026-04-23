@@ -1,9 +1,9 @@
 models:
   qwen:
     name: "通义千问"
-    enabled: false
-    model_id: "qwen-max"                          # 非联网对话用的模型
-    search_model_id: "qwen3.6-plus"               # 联网搜索用的模型（Responses API要求）
+    enabled: true
+    model_id: "qwen3.6-plus"                          # 统一用Responses API
+    search_model_id: "qwen3.6-plus"               # 联网和非联网都走Responses API
     endpoint: "https://dashscope.aliyuncs.com/compatible-mode/v1"
     supports_search: true
     search_api: "responses"                        # 联网走Responses API
@@ -22,12 +22,11 @@ models:
 
   hunyuan:
     name: "腾讯混元"
-    enabled: false
-    model_id: "hunyuan-turbos-latest"
-    endpoint: "https://api.hunyuan.cloud.tencent.com/v1"
-    supports_search: true
-    search_api: "chat_completions"                 # 混元联网走Chat Completions + extra_body
-    search_param: "enable_enhancement"             # 混元用enable_enhancement开启搜索增强
+    enabled: true
+    api_type: "tencent_cloud"                      # 腾讯云原生API（SecretId+SecretKey签名）
+    model_id: "hunyuan-2.0-instruct-20251111"
+    region: "ap-guangzhou"
+    supports_search: true                          # 通过EnableEnhancement开启联网搜索
     concurrency: 5
     request_interval: 0.2
 

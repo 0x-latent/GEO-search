@@ -307,7 +307,54 @@ async def query_single_model(
     logger.info(f"[{model_key}] 全部完成 ({counter['done']}/{total})")
 
 
-async def main():
+def purge_question(question_id: str, models: list = None):
+    """
+    清除指定问题的已有结果和日志，使其可以被重新执行。
+
+    Args:
+        question_id: 问题ID，如 "yishanfu_q1_overall"
+        models: 指定模型列表，如 ["deepseek", "qwen"]。为None则清除所有模型。
+    """
+    import glob as glob_mod
+
+    # 1. 删除结果文件
+    deleted_files = 0
+    if models:
+        search_dirs = [os.path.join(RAW_DIR, m) for m in models]
+    else:
+        search_dirs = [os.path.join(RAW_DIR, d) for d in os.listdir(RAW_DIR)
+                       if os.path.isdir(os.path.join(RAW_DIR, d))]
+
+    for model_dir in search_dirs:
+        if not os.path.exists(model_dir):
+            continue
+        pattern = os.path.join(model_dir, f"{question_id}_*.json")
+        for fpath in glob_mod.glob(pattern):
+            os.remove(fpath)
+            deleted_files += 1
+
+    # 2. 清除日志中的对应记录
+    removed_logs = 0
+    if os.path.exists(LOG_PATH):
+        with open(LOG_PATH, "r", encoding="utf-8") as f:
+            log = json.load(f)
+
+        original_count = len(log.get("executions", []))
+        log["executions"] = [
+            e for e in log.get("executions", [])
+            if not (e["question_id"] == question_id and
+                    (models is None or e["model"] in models))
+        ]
+        removed_logs = original_count - len(log["executions"])
+
+        with open(LOG_PATH, "w", encoding="utf-8") as f:
+            json.dump(log, f, ensure_ascii=False, indent=2)
+
+    model_desc = ", ".join(models) if models else "所有模型"
+    logger.info(f"已清除 {question_id} ({model_desc}): 删除 {deleted_files} 个文件, 移除 {removed_logs} 条日志")
+
+
+async def main(rerun_ids: list = None, rerun_models: list = None):
     config_path = os.path.join(BASE_DIR, "config", "models.yaml")
     keys_path = os.path.join(BASE_DIR, "config", "api_keys.yaml")
 
@@ -320,6 +367,7 @@ async def main():
     query_settings = config.get("query_settings", {})
     rounds = query_settings.get("rounds", 5)
 
+    # 加载问题
     questions_path = os.path.join(BASE_DIR, "questions", "questions_expanded.json")
     if not os.path.exists(questions_path):
         questions_path = os.path.join(BASE_DIR, "questions", "questions_base.json")
@@ -331,6 +379,27 @@ async def main():
 
     with open(questions_path, "r", encoding="utf-8") as f:
         questions = json.load(f)
+
+    # --rerun 模式：校验ID → 全部通过才清除旧数据 → 只跑指定问题
+    if rerun_ids:
+        all_question_ids = {q["id"] for q in questions}
+        invalid_ids = [qid for qid in rerun_ids if qid not in all_question_ids]
+
+        if invalid_ids:
+            logger.error(f"以下问题ID不存在: {invalid_ids}")
+            logger.info("可用的问题ID示例（前10个）:")
+            for q in questions[:10]:
+                logger.info(f"  {q['id']}: {q['question'][:40]}")
+            logger.error("所有ID必须有效才能执行，终止")
+            return
+
+        # 全部校验通过，清除旧数据
+        for qid in rerun_ids:
+            purge_question(qid, rerun_models)
+
+        # 过滤问题列表
+        questions = [q for q in questions if q["id"] in rerun_ids]
+        logger.info(f"重跑模式: {len(questions)} 个问题")
 
     logger.info(f"加载 {len(questions)} 个问题，每题 {rounds} 轮")
 
@@ -344,6 +413,11 @@ async def main():
     for model_key, model_config in config.get("models", {}).items():
         if not model_config.get("enabled", False):
             logger.info(f"[{model_key}] 未启用，跳过")
+            continue
+
+        # --rerun --models 指定了模型时，只跑指定的
+        if rerun_ids and rerun_models and model_key not in rerun_models:
+            logger.info(f"[{model_key}] 不在重跑模型列表中，跳过")
             continue
 
         api_key = keys.get(model_key, {}).get("api_key", "")
@@ -368,11 +442,26 @@ async def main():
     await asyncio.gather(*tasks)
     logger.info("全部执行完成！")
 
+    # 按唯一键去重统计（同一任务可能先failed后success，以最终状态为准）
     log = load_execution_log()
-    success = sum(1 for e in log["executions"] if e["status"] == "success")
-    failed = sum(1 for e in log["executions"] if e["status"] == "failed")
-    logger.info(f"统计: 成功 {success}, 失败 {failed}")
+    final_status = {}
+    for e in log["executions"]:
+        key = (e["question_id"], e["model"], e["search_enabled"], e["round"])
+        final_status[key] = e["status"]
+    success = sum(1 for s in final_status.values() if s == "success")
+    failed = sum(1 for s in final_status.values() if s == "failed")
+    logger.info(f"统计（去重后）: 成功 {success}, 失败 {failed}")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--rerun", nargs="+", metavar="QUESTION_ID",
+                        help="重跑指定问题ID（自动清除旧结果后重新执行）。"
+                             "示例: --rerun yishanfu_q1_overall ganmaolin_q2_detail")
+    parser.add_argument("--models", nargs="+", metavar="MODEL",
+                        help="配合--rerun使用，只重跑指定模型。"
+                             "示例: --models deepseek qwen")
+    args = parser.parse_args()
+
+    asyncio.run(main(rerun_ids=args.rerun, rerun_models=args.models))

@@ -1,0 +1,73 @@
+1. 服务地址
+API 支持就近地域接入，本产品就近地域接入域名为 hunyuan.tencentcloudapi.com ，也支持指定地域域名访问，例如广州地域的域名为 hunyuan.ap-guangzhou.tencentcloudapi.com 。
+
+推荐使用就近地域接入域名。根据调用接口时客户端所在位置，会自动解析到最近的某个具体地域的服务器。例如在广州发起请求，会自动解析到广州的服务器，效果和指定 hunyuan.ap-guangzhou.tencentcloudapi.com 是一致的。
+
+注意：对时延敏感的业务，建议指定带地域的域名。
+
+注意：域名是 API 的接入点，并不代表产品或者接口实际提供服务的地域。产品支持的地域列表请在调用方式/公共参数文档中查阅，接口支持的地域请在接口文档输入参数中查阅。
+
+目前支持的域名列表为：
+就近地域接入（推荐，只支持非金融区）	hunyuan.tencentcloudapi.com
+华南地区（广州）	hunyuan.ap-guangzhou.tencentcloudapi.com
+
+2. 通信协议
+腾讯云 API 的所有接口均通过 HTTPS 进行通信，提供高安全性的通信通道。
+
+3. 请求方法
+支持的 HTTP 请求方法:
+
+POST（推荐）
+GET
+POST 请求支持的 Content-Type 类型：
+
+application/json（推荐），必须使用签名方法 v3（TC3-HMAC-SHA256）。
+application/x-www-form-urlencoded，必须使用签名方法 v1（HmacSHA1 或 HmacSHA256）。
+multipart/form-data（仅部分接口支持），必须使用签名方法 v3（TC3-HMAC-SHA256）。
+GET 请求的请求包大小不得超过32KB。POST 请求使用签名方法 v1（HmacSHA1、HmacSHA256）时不得超过1MB。POST 请求使用签名方法 v3（TC3-HMAC-SHA256）时支持10MB。
+
+公共参数
+公共参数是用于标识用户和接口签名的参数，如非必要，在每个接口单独的文档中不再对这些参数进行说明，但每次请求均需要携带这些参数，才能正常发起请求。
+
+公共参数的具体内容会因您使用的签名方法版本不同而有所差异。
+
+HTTP POST （application/json） 请求结构示例：
+https://cvm.tencentcloudapi.com/
+
+Authorization: TC3-HMAC-SHA256 Credential=AKID********************************/2018-05-30/cvm/tc3_request, SignedHeaders=content-type;host, Signature=582c400e06b5924a6f2b5d7d672d79c15b13162d9279b0855cfba6789a8edb4c
+Content-Type: application/json
+Host: cvm.tencentcloudapi.com
+X-TC-Action: DescribeInstances
+X-TC-Version: 2017-03-12
+X-TC-Timestamp: 1527672334
+X-TC-Region: ap-guangzhou
+
+{"Offset":0,"Limit":10}
+
+
+HTTP GET 请求结构示例:
+https://cvm.tencentcloudapi.com/?Limit=10&Offset=0
+
+Authorization: TC3-HMAC-SHA256 Credential=AKID********************************/2018-10-09/cvm/tc3_request, SignedHeaders=content-type;host, Signature=5da7a33f6993f0614b047e5df4582db9e9bf4672ba50567dba16c6ccf174c474
+Content-Type: application/x-www-form-urlencoded
+Host: cvm.tencentcloudapi.com
+X-TC-Action: DescribeInstances
+X-TC-Version: 2017-03-12
+X-TC-Timestamp: 1539084154
+X-TC-Region: ap-guangzhou
+
+
+签名方法 v3
+签名版本 v3 签名过程
+云 API 支持 GET 和 POST 请求。对于GET方法，只支持 Content-Type: application/x-www-form-urlencoded 协议格式。对于POST方法，目前支持 Content-Type: application/json 以及 Content-Type: multipart/form-data 两种协议格式，json 格式绝大多数接口均支持，multipart 格式只有特定接口支持，此时该接口不能使用 json 格式调用，参考具体业务接口文档说明。推荐使用 POST 请求，因为两者的结果并无差异，但 GET 请求只支持 32 KB 以内的请求包。
+
+返回结果
+正确返回结果
+以云服务器的接口查看实例状态列表 (DescribeInstancesStatus) 2017-03-12 版本为例，若调用成功，其可能的返回如下为：
+{
+        "Response": {
+            "TotalCount": 0,
+            "InstanceStatusSet": [],
+            "RequestId": "b5b41468-520d-4192-b42f-595cc34b6c1c"
+        }
+    }
