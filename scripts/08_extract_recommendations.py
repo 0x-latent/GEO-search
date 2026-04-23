@@ -128,8 +128,10 @@ async def extract_one(client, resp: dict, semaphore: asyncio.Semaphore,
                 enable_search=False,
                 temperature=0.1,
                 max_tokens=2000,
+                json_mode=True,
             )
-            recs = _parse_json_response(result["answer"])
+            raw_json = json.loads(result["answer"])
+            recs = raw_json if isinstance(raw_json, list) else raw_json.get("results", raw_json.get("data", []))
         except Exception as e:
             counter["fail"] += 1
             if counter["fail"] <= 5:
@@ -258,8 +260,12 @@ async def main():
         print("\n生成统计分析...")
         generate_statistics(detail_df, responses)
 
-        print("\n更新Dashboard...")
+        print("\n更新04报表（基于LLM提取数据覆盖正则版本）...")
         generate_updated_dashboard(detail_df, responses)
+        generate_updated_stability(detail_df, responses)
+        generate_updated_competitor(detail_df)
+        generate_updated_search_diff(detail_df, responses)
+        generate_updated_optimization(detail_df, responses)
     else:
         print("未提取到任何推荐信息")
 
@@ -551,6 +557,361 @@ def generate_updated_dashboard(detail_df: pd.DataFrame, responses: list):
     path = os.path.join(ANALYSIS_DIR, "dashboard.csv")
     df.to_csv(path, index=False, encoding="utf-8-sig")
     print(f"  Dashboard已更新（基于Q3-Q5 LLM提取数据） → {path}")
+
+
+def generate_updated_stability(detail_df: pd.DataFrame, responses: list):
+    """
+    基于LLM提取的推荐数据，重新生成稳定性报表。
+    覆盖04脚本基于正则提取的版本，更准确。
+
+    稳定性衡量两个维度：
+    1. 推荐产品集合一致性（Jaccard）：多轮回答推荐的产品是否一样
+    2. 推荐排序一致性：多轮的排序是否相同
+    """
+    # 按 (问题ID, 模型, 联网) 分组，每轮的推荐产品集合
+    from collections import defaultdict
+
+    # 先构建每条应答的推荐产品集合和排序
+    answer_recs = defaultdict(lambda: {"products": set(), "ranking": []})
+    for _, row in detail_df.iterrows():
+        ans_key = f"{row['问题ID']}_{row['模型']}_{row['联网'] == '是'}_{row['轮次']}"
+        answer_recs[ans_key]["products"].add(row["推荐产品"])
+        # 按rank排序构建ranking
+        rank = row["推荐排名"]
+        if isinstance(rank, (int, float)) and row["推荐强度"] in ("strong", "moderate"):
+            answer_recs[ans_key]["ranking"].append((int(rank), row["推荐产品"]))
+
+    # 按 (问题ID, 模型, 联网) 分组
+    groups = defaultdict(list)
+    for resp in responses:
+        qid = resp.get("question_id", "")
+        model = resp.get("model", "")
+        search = resp.get("search_enabled", False)
+        round_num = resp.get("round", "")
+        ans_key = f"{qid}_{model}_{search}_{round_num}"
+
+        groups[(qid, model, search)].append({
+            "round": round_num,
+            "product": resp.get("product", ""),
+            "products": answer_recs.get(ans_key, {}).get("products", set()),
+            "ranking": answer_recs.get(ans_key, {}).get("ranking", []),
+        })
+
+    rows = []
+    for (qid, model, search), rounds in groups.items():
+        if len(rounds) < 2:
+            continue
+
+        product = rounds[0]["product"]
+
+        # 1. 推荐产品集合的Jaccard相似度
+        product_sets = [frozenset(r["products"]) for r in rounds]
+        jaccards = []
+        for i in range(len(product_sets)):
+            for j in range(i + 1, len(product_sets)):
+                union = product_sets[i] | product_sets[j]
+                inter = product_sets[i] & product_sets[j]
+                jaccards.append(len(inter) / len(union) if union else 1.0)
+
+        avg_jaccard = round(sum(jaccards) / len(jaccards), 3) if jaccards else 1.0
+
+        # 2. 推荐排序一致性
+        sorted_rankings = []
+        for r in rounds:
+            ranking = sorted(r["ranking"], key=lambda x: x[0])
+            sorted_rankings.append(tuple(name for _, name in ranking))
+
+        non_empty_rankings = [r for r in sorted_rankings if r]
+        if non_empty_rankings:
+            ranking_consistent = len(set(non_empty_rankings)) == 1
+            unique_count = len(set(non_empty_rankings))
+        else:
+            ranking_consistent = None
+            unique_count = 0
+
+        # 3. 999产品提及稳定性
+        has_999_per_round = [
+            any(_is_999_product(p) for p in r["products"])
+            for r in rounds
+        ]
+        all_mention = all(has_999_per_round)
+        none_mention = not any(has_999_per_round)
+        if all_mention:
+            stability_999 = "稳定提及"
+        elif none_mention:
+            stability_999 = "稳定未提及"
+        else:
+            mention_count = sum(has_999_per_round)
+            stability_999 = f"不稳定({mention_count}/{len(has_999_per_round)}轮提及)"
+
+        rows.append({
+            "问题ID": qid,
+            "产品": product,
+            "模型": model,
+            "联网": "是" if search else "否",
+            "轮次数": len(rounds),
+            "推荐产品Jaccard均值": avg_jaccard,
+            "推荐排序完全一致": ranking_consistent,
+            "排序变体数": unique_count,
+            "999提及稳定性": stability_999,
+        })
+
+    df = pd.DataFrame(rows)
+    df = df.sort_values(["产品", "模型", "联网", "问题ID"]).reset_index(drop=True)
+    path = os.path.join(ANALYSIS_DIR, "stability_report.csv")
+    df.to_csv(path, index=False, encoding="utf-8-sig")
+    print(f"  稳定性报表已更新（基于LLM提取数据） → {path}")
+
+
+def generate_updated_competitor(detail_df: pd.DataFrame):
+    """
+    基于LLM提取数据覆盖竞品图谱。
+    比04的keyword版本更准确：LLM能识别正则匹配不到的产品名。
+    """
+    rows = []
+    groups = defaultdict(lambda: defaultdict(int))
+
+    for _, row in detail_df.iterrows():
+        if _is_999_product(row["推荐产品"]):
+            continue
+        groups[row["产品"]][row["推荐产品"]] += 1
+
+    # 计算每个产品的总应答数（用于出现率）
+    product_totals = detail_df.groupby("产品").apply(
+        lambda x: x.drop_duplicates(subset=["问题ID", "模型", "联网", "轮次"]).shape[0]
+    ).to_dict()
+
+    for product, competitors in groups.items():
+        total = product_totals.get(product, 1)
+        for comp, count in sorted(competitors.items(), key=lambda x: -x[1]):
+            rows.append({
+                "产品": product,
+                "竞品": comp,
+                "出现次数": count,
+                "出现率": round(count / total, 3),
+            })
+
+    df = pd.DataFrame(rows)
+    path = os.path.join(ANALYSIS_DIR, "competitor_report.csv")
+    df.to_csv(path, index=False, encoding="utf-8-sig")
+    print(f"  竞品图谱已更新（基于LLM提取数据） → {path}")
+
+
+def generate_updated_search_diff(detail_df: pd.DataFrame, responses: list):
+    """
+    基于LLM提取数据覆盖联网差异分析。
+    对比联网和不联网下的999推荐变化及竞品变化。
+    """
+    # 构建每条应答的推荐产品集合
+    answer_products = defaultdict(set)
+    answer_999 = {}
+    for _, row in detail_df.iterrows():
+        ans_key = f"{row['问题ID']}_{row['模型']}_{row['联网'] == '是'}_{row['轮次']}"
+        answer_products[ans_key].add(row["推荐产品"])
+        if _is_999_product(row["推荐产品"]):
+            answer_999[ans_key] = True
+
+    # 按 问题ID×模型 分组
+    groups = defaultdict(lambda: {"search": [], "nosearch": []})
+    for resp in responses:
+        qid = resp.get("question_id", "")
+        model = resp.get("model", "")
+        search = resp.get("search_enabled", False)
+        round_num = resp.get("round", "")
+        ans_key = f"{qid}_{model}_{search}_{round_num}"
+        mode = "search" if search else "nosearch"
+        groups[(qid, model)][mode].append(ans_key)
+
+    rows = []
+    for (qid, model), pair in groups.items():
+        if not pair["search"] or not pair["nosearch"]:
+            continue
+
+        product = None
+        for resp in responses:
+            if resp.get("question_id") == qid:
+                product = resp.get("product", "")
+                break
+
+        # 999提及率
+        ns_999 = sum(1 for k in pair["nosearch"] if answer_999.get(k)) / len(pair["nosearch"])
+        s_999 = sum(1 for k in pair["search"] if answer_999.get(k)) / len(pair["search"])
+
+        # 推荐产品差异
+        ns_products = set()
+        for k in pair["nosearch"]:
+            ns_products.update(answer_products.get(k, set()))
+        s_products = set()
+        for k in pair["search"]:
+            s_products.update(answer_products.get(k, set()))
+
+        only_search = s_products - ns_products
+        only_nosearch = ns_products - s_products
+
+        rows.append({
+            "问题ID": qid,
+            "产品": product,
+            "模型": model,
+            "联网999提及率": round(s_999, 3),
+            "不联网999提及率": round(ns_999, 3),
+            "提及率差异": round(s_999 - ns_999, 3),
+            "仅联网推荐的产品": ", ".join(sorted(only_search)) if only_search else "",
+            "仅不联网推荐的产品": ", ".join(sorted(only_nosearch)) if only_nosearch else "",
+        })
+
+    df = pd.DataFrame(rows)
+    df = df.sort_values(["产品", "模型", "问题ID"]).reset_index(drop=True)
+    path = os.path.join(ANALYSIS_DIR, "search_diff_report.csv")
+    df.to_csv(path, index=False, encoding="utf-8-sig")
+    print(f"  联网差异已更新（基于LLM提取数据） → {path}")
+
+
+def generate_updated_optimization(detail_df: pd.DataFrame, responses: list):
+    """
+    基于LLM提取数据覆盖优化建议报表。
+    判断逻辑与04版本类似，但数据源更准确。
+    """
+    # 构建每条应答的999推荐信息
+    answer_999 = {}
+    for _, row in detail_df.iterrows():
+        ans_key = f"{row['问题ID']}_{row['模型']}_{row['联网'] == '是'}_{row['轮次']}"
+        if _is_999_product(row["推荐产品"]):
+            if ans_key not in answer_999:
+                answer_999[ans_key] = {"strong": False, "any": False, "rank": None}
+            answer_999[ans_key]["any"] = True
+            if row["推荐强度"] == "strong":
+                answer_999[ans_key]["strong"] = True
+            rank = row["推荐排名"]
+            if isinstance(rank, (int, float)):
+                cur = answer_999[ans_key]["rank"]
+                if cur is None or rank < cur:
+                    answer_999[ans_key]["rank"] = rank
+
+    # 按产品×模型分组
+    groups = defaultdict(lambda: {"nosearch": [], "search": [], "all": []})
+    for resp in responses:
+        product = resp.get("product", "")
+        model = resp.get("model", "")
+        search = resp.get("search_enabled", False)
+        ans_key = f"{resp.get('question_id', '')}_{model}_{search}_{resp.get('round', '')}"
+        mode = "search" if search else "nosearch"
+        groups[(product, model)][mode].append(ans_key)
+        groups[(product, model)]["all"].append(ans_key)
+
+    # 竞品统计
+    comp_by_group = defaultdict(lambda: defaultdict(int))
+    for _, row in detail_df.iterrows():
+        if _is_999_product(row["推荐产品"]):
+            continue
+        comp_by_group[(row["产品"], row["模型"])][row["推荐产品"]] += 1
+
+    rows = []
+    for (product, model), modes in groups.items():
+        issues = []
+        priorities = []
+
+        # 1. 999强推荐率
+        all_keys = modes["all"]
+        if all_keys:
+            strong_count = sum(1 for k in all_keys if answer_999.get(k, {}).get("strong"))
+            any_count = sum(1 for k in all_keys if answer_999.get(k, {}).get("any"))
+            strong_rate = strong_count / len(all_keys)
+            any_rate = any_count / len(all_keys)
+
+            if any_rate < 0.2:
+                issues.append(f"999几乎不被提及(提及率{any_rate:.0%})")
+                priorities.append("高")
+            elif any_rate < 0.5:
+                issues.append(f"999提及率偏低({any_rate:.0%})")
+                priorities.append("中")
+
+            if strong_rate == 0 and any_rate > 0:
+                issues.append("999被提及但从未被强推荐")
+                priorities.append("中")
+
+        # 2. 999排名
+        ranks = [answer_999[k]["rank"] for k in all_keys if answer_999.get(k, {}).get("rank") is not None]
+        if ranks and sum(ranks) / len(ranks) > 3.0:
+            issues.append(f"999平均排名靠后({sum(ranks)/len(ranks):.1f})")
+            priorities.append("中")
+
+        # 3. 联网影响
+        ns_keys = modes["nosearch"]
+        s_keys = modes["search"]
+        if ns_keys and s_keys:
+            ns_any = sum(1 for k in ns_keys if answer_999.get(k, {}).get("any")) / len(ns_keys)
+            s_any = sum(1 for k in s_keys if answer_999.get(k, {}).get("any")) / len(s_keys)
+            diff = s_any - ns_any
+            if diff < -0.2:
+                issues.append(f"联网后999提及率下降({diff:+.0%})，线上内容可能不利")
+                priorities.append("高")
+            elif diff > 0.2:
+                issues.append(f"联网后999提及率提升({diff:+.0%})，线上内容有正面作用")
+                priorities.append("低(正面)")
+
+        # 4. 稳定性
+        qid_groups = defaultdict(list)
+        for k in all_keys:
+            qid = k.rsplit("_", 3)[0]
+            qid_groups[qid].append(answer_999.get(k, {}).get("any", False))
+
+        unstable = sum(1 for vals in qid_groups.values() if len(vals) > 1 and True in vals and False in vals)
+        if len(qid_groups) > 0 and unstable / len(qid_groups) > 0.4:
+            issues.append(f"回答不稳定：{unstable}/{len(qid_groups)}个问题中999提及不一致")
+            priorities.append("中")
+
+        # 5. 主要竞品
+        comps = comp_by_group.get((product, model), {})
+        top_comp = [f"{c}({n}次)" for c, n in sorted(comps.items(), key=lambda x: -x[1])[:3]]
+
+        if not issues:
+            issues.append("表现良好，暂无明显薄弱环节")
+            priorities.append("低")
+
+        priority = "高" if "高" in priorities else ("中" if "中" in priorities else "低")
+
+        suggestions = _generate_suggestions(issues)
+
+        rows.append({
+            "产品": product,
+            "模型": model,
+            "优先级": priority,
+            "问题数": len(issues),
+            "发现": " | ".join(issues),
+            "主要竞品": ", ".join(top_comp) if top_comp else "",
+            "建议方向": suggestions,
+        })
+
+    df = pd.DataFrame(rows)
+    df = df.sort_values(["优先级", "产品", "模型"]).reset_index(drop=True)
+    path = os.path.join(ANALYSIS_DIR, "optimization_report.csv")
+    df.to_csv(path, index=False, encoding="utf-8-sig")
+    print(f"  优化建议已更新（基于LLM提取数据） → {path}")
+
+
+def _generate_suggestions(issues: list) -> str:
+    suggestions = []
+    issue_text = " ".join(issues)
+
+    if "不被提及" in issue_text or "提及率偏低" in issue_text:
+        suggestions.append("加强产品与症状/场景的内容关联，在权威平台发布对症用药指南")
+
+    if "从未被强推荐" in issue_text:
+        suggestions.append("强化产品差异化优势内容，突出独特卖点和使用场景")
+
+    if "排名靠后" in issue_text:
+        suggestions.append("在专业药学平台、百科、问答社区提升品牌品类关联度")
+
+    if "联网后" in issue_text and "下降" in issue_text:
+        suggestions.append("排查线上负面或竞品SEO内容，优化品牌搜索结果质量")
+
+    if "不稳定" in issue_text:
+        suggestions.append("模型对品牌认知不够强，需多渠道持续建设品牌内容")
+
+    if not suggestions:
+        suggestions.append("持续监测，保持当前内容建设")
+
+    return " | ".join(suggestions)
 
 
 if __name__ == "__main__":

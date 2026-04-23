@@ -1,27 +1,29 @@
 """
-用知识库校对AI应答的准确性。
+用知识库校对AI应答的准确性（Q1-Q2产品认知类问题）。
 两种模式：
-1. keyword — 关键词匹配（快速，离线）：检查回答中是否包含关键知识点的关键词
-2. llm — LLM校对（精准，在线）：调用GPT-5.4，综合多轮回答判断准确性
-需手动触发执行。相似度数据由04脚本预先计算（answer_similarity.csv）。
+1. keyword — 关键词匹配（快速，离线）
+2. llm — DeepSeek V3.2校对（精准，在线，10并发，全量5轮发送）
+需手动触发执行。
 """
 import asyncio
 import json
 import os
-import random
 import sys
 import glob
 import yaml
 import pandas as pd
+from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.api_clients import OpenAIClient
-from utils.similarity import clean_text, calc_similarity
+from utils.api_clients import ModelClient
+from utils.similarity import clean_text
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 KB_PATH = os.path.join(BASE_DIR, "config", "knowledge_base.json")
 RAW_DIR = os.path.join(BASE_DIR, "results", "raw")
 ANALYSIS_DIR = os.path.join(BASE_DIR, "results", "analysis")
+
+LLM_CONCURRENCY = 10
 
 PRODUCT_KB_MAP = {
     "感冒灵": "感冒灵",
@@ -44,7 +46,6 @@ def load_knowledge_base() -> dict:
 
 
 def load_accuracy_responses() -> list:
-    """加载准确率相关问题（q1/q2）的应答"""
     responses = []
     pattern = os.path.join(RAW_DIR, "**", "*.json")
     for fpath in glob.glob(pattern, recursive=True):
@@ -59,18 +60,6 @@ def load_accuracy_responses() -> list:
         except Exception:
             continue
     return responses
-
-
-def load_similarity_data() -> dict:
-    """加载04脚本预计算的相似度数据"""
-    path = os.path.join(ANALYSIS_DIR, "answer_similarity.csv")
-    result = {}
-    if os.path.exists(path):
-        df = pd.read_csv(path, encoding="utf-8-sig")
-        for _, row in df.iterrows():
-            key = (row["问题ID"], row["模型"], row["联网"] == "是")
-            result[key] = row["TF-IDF相似度"]
-    return result
 
 
 # ===== 关键词校对 =====
@@ -140,17 +129,17 @@ async def run_keyword_verification():
     print(f"关键词校对报表 → {path}")
 
 
-# ===== LLM校对 =====
+# ===== LLM校对（DeepSeek V3.2） =====
 
 LLM_VERIFY_PROMPT = """你是一个药品信息准确性审核专家。你需要判断AI模型对某个药品的认知是否准确。
 
 ## 背景
-同一个问题对同一个AI模型问了{round_count}轮。下面提供了回答内容（已预处理）。
+同一个问题对同一个AI模型问了{round_count}轮，以下是全部{round_count}轮回答。
 
 产品：{product_name}
 问题：{question}
 
-## 回答内容
+## 全部回答
 {answers_text}
 
 ## 需要校对的知识点
@@ -175,42 +164,36 @@ LLM_VERIFY_PROMPT = """你是一个药品信息准确性审核专家。你需要
   - not_applicable: 知识点与该问题无关
 - "correct_rounds": 正确提及的轮次数（0-{round_count}）
 - "wrong_rounds": 出现错误的轮次数（0-{round_count}）
-- "detail": 简要说明（30字以内，如"5轮中3轮正确，1轮说法错误，1轮未提及"）
+- "matched_content": AI回答中与该知识点相关的原文摘录（50字以内）。如果verdict是missing或not_applicable则留空字符串
+- "error_content": 如果verdict是wrong或inconsistent，说明AI具体错在哪里、正确说法应该是什么（80字以内）。其他情况留空字符串
+- "detail": 简要说明（30字以内，如"5轮中4轮正确，1轮说法有误"）
 
 只返回JSON数组。"""
 
 
-def _build_answers_text(answers: list, similarity: float) -> str:
-    """
-    根据预计算的相似度决定发送策略：
-    - 相似度 > 0.85：随机取2条代表
-    - 相似度 ≤ 0.85：全量发送
-    """
+def _build_answers_text(answers: list) -> str:
+    """清洗并拼接全部轮次回答"""
     cleaned = [clean_text(a) for a in answers]
-
-    if len(cleaned) <= 1:
-        return f"--- 第1轮（仅1轮） ---\n{cleaned[0][:2000]}\n"
-
-    if similarity > 0.85:
-        indices = sorted(random.sample(range(len(cleaned)), min(2, len(cleaned))))
-        parts = [f"--- 第{i+1}轮 ---\n{cleaned[i][:1500]}\n" for i in indices]
-        header = (
-            f"（{len(answers)}轮回答相似度={similarity:.2f}，高度相似，"
-            f"随机抽取第{'、'.join(str(i+1) for i in indices)}轮作为代表）\n\n"
-        )
-        return header + "\n".join(parts)
-    else:
-        parts = []
-        for i, a in enumerate(cleaned):
-            truncated = a[:1000] + ("...（截断）" if len(a) > 1000 else "")
-            parts.append(f"--- 第{i+1}轮 ---\n{truncated}\n")
-        header = f"（{len(answers)}轮回答相似度={similarity:.2f}，存在明显差异，全量展示）\n\n"
-        return header + "\n".join(parts)
+    parts = []
+    for i, a in enumerate(cleaned):
+        truncated = a[:1200] + ("...（截断）" if len(a) > 1200 else "")
+        parts.append(f"--- 第{i+1}轮 ---\n{truncated}")
+    return "\n\n".join(parts)
 
 
-async def llm_verify_aggregated(client: OpenAIClient, product_name: str,
-                                 question: str, answers: list, facts: list,
-                                 similarity: float) -> list:
+def _parse_json_response(text: str) -> list:
+    text = text.strip()
+    if text.startswith("```"):
+        lines = text.split("\n")
+        text = "\n".join(lines[1:])
+        if text.endswith("```"):
+            text = text[:-3]
+        text = text.strip()
+    return json.loads(text)
+
+
+async def llm_verify_aggregated(client: ModelClient, product_name: str,
+                                 question: str, answers: list, facts: list) -> list:
     check_facts = [f for f in facts if f.get("importance") in ("critical", "important")]
     if not check_facts:
         return []
@@ -220,32 +203,30 @@ async def llm_verify_aggregated(client: OpenAIClient, product_name: str,
         for i, f in enumerate(check_facts)
     )
 
-    answers_text = _build_answers_text(answers, similarity)
-    strategy = "取2条代表" if similarity > 0.85 else "全量发送"
+    answers_text = _build_answers_text(answers)
 
-    prompt = LLM_VERIFY_PROMPT.format(
+    # 拼接为单条问题发给DeepSeek（走chat completions）
+    system = "你是药品信息准确性审核专家。严格按要求返回JSON。"
+    user = LLM_VERIFY_PROMPT.format(
         product_name=product_name,
         question=question,
         round_count=len(answers),
         answers_text=answers_text,
         facts_text=facts_text,
     )
+    full_prompt = f"{system}\n\n{user}"
 
     try:
-        response = await client.generate(
-            system_prompt="你是药品信息准确性审核专家。严格按要求返回JSON。",
-            user_prompt=prompt,
+        result = await client.query(
+            question=full_prompt,
+            enable_search=False,
             temperature=0.1,
-            max_completion_tokens=4000,
+            max_tokens=4000,
+            json_mode=True,
         )
-        text = response.strip()
-        if text.startswith("```"):
-            lines = text.split("\n")
-            text = "\n".join(lines[1:])
-            if text.endswith("```"):
-                text = text[:-3]
-            text = text.strip()
-        verdicts = json.loads(text)
+        # json_mode保证返回合法JSON，但可能外层包了个对象，需要提取数组
+        raw_json = json.loads(result["answer"])
+        verdicts = raw_json if isinstance(raw_json, list) else raw_json.get("results", raw_json.get("data", []))
 
         for v in verdicts:
             idx = v.get("fact_index", 0)
@@ -253,23 +234,17 @@ async def llm_verify_aggregated(client: OpenAIClient, product_name: str,
                 v["fact"] = check_facts[idx]["fact"]
                 v["importance"] = check_facts[idx]["importance"]
                 v["category"] = check_facts[idx].get("category", "")
-            v["answer_similarity"] = round(similarity, 3)
-            v["send_strategy"] = strategy
         return verdicts
     except Exception as e:
         print(f"  LLM校对失败: {e}")
         return []
 
 
-LLM_CONCURRENCY = 5  # LLM校对并发数
-
-
 async def _verify_one_group(
-    client: OpenAIClient,
+    client: ModelClient,
     kb: dict,
     qid: str, model: str, search_enabled: bool,
     group_resps: list,
-    sim_data: dict,
     semaphore: asyncio.Semaphore,
     counter: dict,
 ):
@@ -284,19 +259,13 @@ async def _verify_one_group(
     question = group_resps[0].get("question_text", "")
     answers = [r.get("answer", "") for r in group_resps]
 
-    similarity = sim_data.get((qid, model, search_enabled))
-    if similarity is None:
-        cleaned = [clean_text(a) for a in answers]
-        similarity = calc_similarity(cleaned)
-
     async with semaphore:
         search_tag = "联网" if search_enabled else "不联网"
-        strategy = "取2条" if similarity > 0.85 else "全量"
         counter["done"] += 1
-        print(f"({counter['done']}/{counter['total']}) {product}×{model}×{search_tag} sim={similarity:.2f} [{strategy}]")
+        print(f"({counter['done']}/{counter['total']}) {product}×{model}×{search_tag} ({len(answers)}轮)")
 
         verdicts = await llm_verify_aggregated(
-            client, product, question, answers, facts, similarity,
+            client, product, question, answers, facts,
         )
         for v in verdicts:
             v["question_id"] = qid
@@ -312,24 +281,26 @@ async def run_llm_verification(api_key: str):
     responses = load_accuracy_responses()
     print(f"加载 {len(responses)} 条准确率相关应答")
 
-    sim_data = load_similarity_data()
-    print(f"加载 {len(sim_data)} 条预计算相似度")
+    # 初始化DeepSeek客户端
+    config_path = os.path.join(BASE_DIR, "config", "models.yaml")
+    with open(config_path, "r", encoding="utf-8") as f:
+        config = yaml.safe_load(f)
 
-    client = OpenAIClient(api_key=api_key, model="gpt-5.4")
+    ds_config = config["models"]["deepseek"]
+    client = ModelClient("deepseek", ds_config, api_key)
     semaphore = asyncio.Semaphore(LLM_CONCURRENCY)
 
-    from collections import defaultdict
+    # 按 问题ID×模型×联网模式 分组
     groups = defaultdict(list)
     for resp in responses:
         key = (resp.get("question_id", ""), resp.get("model", ""), resp.get("search_enabled", False))
         groups[key].append(resp)
 
     counter = {"done": 0, "total": len(groups)}
-    print(f"共 {counter['total']} 个分组，并发 {LLM_CONCURRENCY}")
+    print(f"共 {counter['total']} 个分组，并发 {LLM_CONCURRENCY}，全量发送全部轮次")
 
-    # 构建所有并发任务
     tasks = [
-        _verify_one_group(client, kb, qid, model, search_enabled, group_resps, sim_data, semaphore, counter)
+        _verify_one_group(client, kb, qid, model, search_enabled, group_resps, semaphore, counter)
         for (qid, model, search_enabled), group_resps in groups.items()
     ]
 
@@ -372,13 +343,15 @@ async def run_llm_verification(api_key: str):
         summary_path = os.path.join(ANALYSIS_DIR, "accuracy_llm_summary.csv")
         summary_df.to_csv(summary_path, index=False, encoding="utf-8-sig")
         print(f"LLM校对汇总 → {summary_path}")
+    else:
+        print("未产生校对结果（可能知识库中没有对应产品）")
 
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", choices=["keyword", "llm", "both"], default="keyword",
-                        help="模式: keyword(关键词校对), llm(LLM校对), both(两者都跑)")
+                        help="模式: keyword(关键词校对), llm(DeepSeek校对), both(两者都跑)")
     args = parser.parse_args()
 
     keys_path = os.path.join(BASE_DIR, "config", "api_keys.yaml")
@@ -386,9 +359,9 @@ if __name__ == "__main__":
     if args.mode in ("llm", "both"):
         with open(keys_path, "r", encoding="utf-8") as f:
             keys = yaml.safe_load(f)
-        api_key = keys.get("openai", {}).get("api_key", "")
+        api_key = keys.get("deepseek", {}).get("api_key", "")
         if not api_key or api_key == "sk-xxx":
-            print("错误: LLM模式需要OpenAI API key")
+            print("错误: LLM模式需要DeepSeek API key")
             sys.exit(1)
 
     async def main():
@@ -397,7 +370,7 @@ if __name__ == "__main__":
             await run_keyword_verification()
 
         if args.mode in ("llm", "both"):
-            print("\n=== LLM精准校对 ===")
+            print("\n=== DeepSeek LLM校对（全量5轮，10并发） ===")
             await run_llm_verification(api_key)
 
     asyncio.run(main())

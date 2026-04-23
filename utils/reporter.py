@@ -11,14 +11,15 @@ def generate_all_reports(parsed_results: list, output_dir: str):
     os.makedirs(output_dir, exist_ok=True)
 
     generate_mention_report(parsed_results, output_dir)
-    generate_recommendation_report(parsed_results, output_dir)
-    generate_stability_report(parsed_results, output_dir)
-    generate_search_diff_report(parsed_results, output_dir)
+    generate_stability_report(parsed_results, output_dir)      # 初版，08会覆盖
+    generate_search_diff_report(parsed_results, output_dir)    # 初版，08会覆盖
     generate_source_report(parsed_results, output_dir)
-    generate_competitor_report(parsed_results, output_dir)
+    generate_competitor_report(parsed_results, output_dir)     # 初版，08会覆盖
     generate_accuracy_summary(parsed_results, output_dir)
     generate_variant_sensitivity_report(parsed_results, output_dir)
     generate_cross_model_report(parsed_results, output_dir)
+    generate_dashboard(parsed_results, output_dir)             # 初版，08会覆盖
+    generate_optimization_report(parsed_results, output_dir)   # 初版，08会覆盖
     generate_dashboard(parsed_results, output_dir)
     generate_optimization_report(parsed_results, output_dir)
 

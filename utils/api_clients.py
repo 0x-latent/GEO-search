@@ -60,7 +60,8 @@ class ModelClient:
             raise ImportError("请安装腾讯云SDK: pip install tencentcloud-sdk-python-hunyuan")
 
     async def query(self, question: str, enable_search: bool = False,
-                    temperature: float = 0.7, max_tokens: int = 2048) -> dict:
+                    temperature: float = 0.7, max_tokens: int = 2048,
+                    json_mode: bool = False) -> dict:
         actual_search = enable_search and self.supports_search
 
         if self._hunyuan_client:
@@ -68,7 +69,7 @@ class ModelClient:
         elif self.search_api == "responses":
             return await self._query_responses_api(question, actual_search, temperature, max_tokens)
         else:
-            return await self._query_chat_completions(question, actual_search, temperature, max_tokens)
+            return await self._query_chat_completions(question, actual_search, temperature, max_tokens, json_mode)
 
     async def _query_hunyuan(self, question: str, enable_search: bool,
                               temperature: float, max_tokens: int) -> dict:
@@ -138,7 +139,8 @@ class ModelClient:
             raise
 
     async def _query_chat_completions(self, question: str, enable_search: bool,
-                                       temperature: float, max_tokens: int) -> dict:
+                                       temperature: float, max_tokens: int,
+                                       json_mode: bool = False) -> dict:
         """标准Chat Completions API调用"""
         start = time.time()
 
@@ -149,6 +151,9 @@ class ModelClient:
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
+
+        if json_mode:
+            kwargs["response_format"] = {"type": "json_object"}
 
         if enable_search:
             search_param = self.config.get("search_param", "")

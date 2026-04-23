@@ -36,7 +36,7 @@
   # 7. 跑keyword校对（免费）
   python scripts/07_verify_accuracy.py --mode keyword
 
-  # 7.1 跑LLM校对（花钱，自动读取04预计算的相似度来决定发2条还是5条）
+  # 7.1 跑LLM校对（5轮结果全量发送）
   python scripts/07_verify_accuracy.py --mode llm
 
   # 7.3 或者keyword+llm一起
