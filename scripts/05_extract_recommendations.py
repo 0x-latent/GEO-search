@@ -266,6 +266,11 @@ async def main():
         generate_updated_competitor(detail_df)
         generate_updated_search_diff(detail_df, responses)
         generate_updated_optimization(detail_df, responses)
+
+        print("\nV6框架补充报表...")
+        generate_brand_generic_split(detail_df, responses)
+        generate_unified_mention_report(detail_df, responses)
+        generate_competitor_type(detail_df)
     else:
         print("未提取到任何推荐信息")
 
@@ -912,6 +917,366 @@ def _generate_suggestions(issues: list) -> str:
         suggestions.append("持续监测，保持当前内容建设")
 
     return " | ".join(suggestions)
+
+
+def _load_brand_config():
+    """加载brands.yaml配置"""
+    path = os.path.join(BASE_DIR, "config", "brands.yaml")
+    with open(path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+def _build_product_name_map():
+    """
+    构建产品名映射：原始数据中的产品短名 → yaml配置中的标准名。
+    直接使用brands.yaml中的product_name_map配置。
+    """
+    config = _load_brand_config()
+    mapping = config.get("product_name_map", {})
+    # 标准名也映射到自身
+    for v in set(mapping.values()):
+        mapping[v] = v
+    return mapping
+
+
+def generate_brand_generic_split(detail_df: pd.DataFrame, responses: list):
+    """
+    推荐产品分类（任务二）：
+    对recommendation_detail中的每一条推荐产品，标注归属和名称类型。
+    - 归属：999自有 / 竞品
+    - 名称类型：品牌名 / 通用名 / 成分品类级
+    所有关键词来自brands.yaml，修改yaml后重跑即可。
+    输出 brand_generic_detail.csv（全量明细） + brand_generic_summary.csv（999产品汇总）
+    """
+    config = _load_brand_config()
+    brand_kw = config.get("brand_keywords", {})
+    generic_kw = config.get("generic_names", {})
+    competitor_brands = set(config.get("known_brand_competitors", []))
+    component_kw = config.get("component_keywords", [])
+    product_map = _build_product_name_map()
+
+    def _get_level(qid):
+        for tag in ["q3", "q4", "q5"]:
+            if f"_{tag}_" in qid:
+                return tag
+        return ""
+
+    def _classify(rec_product: str, cat_key: str) -> str:
+        """
+        返回名称类型。优先级：
+        1. 999品牌：命中B0品牌关键词（含999/三九等品牌标识）
+        2. 竞品品牌：命中known_brand_competitors
+        3. 通用名：命中B2通用名，或以上都没命中的默认值
+        4. 成分品类级：命中component_keywords
+        """
+        # === 1. 999品牌 ===
+        if cat_key in brand_kw and any(kw in rec_product for kw in brand_kw[cat_key]):
+            return "999品牌"
+
+        # === 2. 竞品品牌 ===
+        for cb in competitor_brands:
+            if cb in rec_product:
+                return "竞品品牌"
+
+        # === 3. 成分品类级（在通用名之前检查，避免成分词被当通用名）===
+        for comp in component_kw:
+            if comp in rec_product:
+                return "成分品类级"
+
+        # === 4. 通用名（命中B2的，或默认） ===
+        return "通用名"
+
+    detail_rows = []
+    for _, row in detail_df.iterrows():
+        qid = row["问题ID"]
+        level = _get_level(qid)
+        if not level:
+            continue
+
+        product = row["产品"]
+        cat_key = product_map.get(product)
+        if not cat_key:
+            continue
+
+        rec_product = str(row["推荐产品"])
+        strength = row["推荐强度"]
+        reason = row["推荐理由"]
+        is_recommend = 1 if strength in ("strong", "moderate") else 0
+        name_type = _classify(rec_product, cat_key)
+
+        detail_rows.append({
+            "问题ID": qid,
+            "产品": product,
+            "问题层级": level.upper(),
+            "模型": row["模型"],
+            "联网": row["联网"],
+            "轮次": row["轮次"],
+            "推荐排名": row["推荐排名"],
+            "推荐产品": rec_product,
+            "名称类型": name_type,
+            "推荐强度": strength,
+            "是否推荐": is_recommend,
+            "推荐原因": reason if is_recommend else "",
+        })
+
+    if not detail_rows:
+        print("  推荐产品分类: 无数据")
+        return
+
+    detail_out = pd.DataFrame(detail_rows)
+    path = os.path.join(ANALYSIS_DIR, "brand_generic_detail.csv")
+    detail_out.to_csv(path, index=False, encoding="utf-8-sig")
+    print(f"  推荐产品分类明细 → {path} ({len(detail_out)} 条)")
+
+    # 分布统计
+    counts = detail_out["名称类型"].value_counts()
+    print(f"    名称类型: {dict(counts)}")
+
+    # === 999产品汇总统计 ===
+    answer_totals = defaultdict(int)
+    for resp in responses:
+        qid = resp.get("question_id", "")
+        level = _get_level(qid)
+        if not level:
+            continue
+        product = resp.get("product", "")
+        model = resp.get("model", "")
+        search = "是" if resp.get("search_enabled") else "否"
+        level_group = "Q3/Q4" if level in ("q3", "q4") else "Q5"
+        answer_totals[(product, level_group, model, search)] += 1
+
+    # 按名称类型分别统计提及和推荐
+    summary_groups = defaultdict(lambda: {
+        "999brand_m": 0, "999brand_r": 0,
+        "generic_m": 0, "generic_r": 0,
+        "compbrand_m": 0, "compbrand_r": 0,
+        "component_m": 0,
+    })
+    for row in detail_rows:
+        level_group = "Q3/Q4" if row["问题层级"] in ("Q3", "Q4") else "Q5"
+        gk = (row["产品"], level_group, row["模型"], row["联网"])
+        nt = row["名称类型"]
+        is_rec = row["是否推荐"] == 1
+        if nt == "999品牌":
+            summary_groups[gk]["999brand_m"] += 1
+            if is_rec: summary_groups[gk]["999brand_r"] += 1
+        elif nt == "竞品品牌":
+            summary_groups[gk]["compbrand_m"] += 1
+            if is_rec: summary_groups[gk]["compbrand_r"] += 1
+        elif nt == "通用名":
+            summary_groups[gk]["generic_m"] += 1
+            if is_rec: summary_groups[gk]["generic_r"] += 1
+        elif nt == "成分品类级":
+            summary_groups[gk]["component_m"] += 1
+
+    summary_rows = []
+    for (product, level_group, model, search), g in summary_groups.items():
+        total = answer_totals.get((product, level_group, model, search), 0)
+        divisor = total if total > 0 else 1
+        summary_rows.append({
+            "产品": product,
+            "问题层级分组": level_group,
+            "模型": model,
+            "联网": search,
+            "总回答数": total,
+            "999品牌提及次数": g["999brand_m"],
+            "999品牌提及率": round(g["999brand_m"] / divisor, 3),
+            "999品牌推荐率": round(g["999brand_r"] / divisor, 3),
+            "通用名提及次数": g["generic_m"],
+            "通用名提及率": round(g["generic_m"] / divisor, 3),
+            "通用名推荐率": round(g["generic_r"] / divisor, 3),
+            "竞品品牌提及次数": g["compbrand_m"],
+            "竞品品牌提及率": round(g["compbrand_m"] / divisor, 3),
+            "竞品品牌推荐率": round(g["compbrand_r"] / divisor, 3),
+            "成分品类级提及次数": g["component_m"],
+        })
+
+    summary_df = pd.DataFrame(summary_rows)
+    summary_df = summary_df.sort_values(["产品", "问题层级分组", "模型", "联网"]).reset_index(drop=True)
+    path = os.path.join(ANALYSIS_DIR, "brand_generic_summary.csv")
+    summary_df.to_csv(path, index=False, encoding="utf-8-sig")
+    print(f"  推荐产品分类汇总 → {path}")
+
+
+def generate_unified_mention_report(detail_df: pd.DataFrame, responses: list):
+    """
+    统一提及率报表：合并品类提及、999品牌、通用名、竞品品牌的提及数据。
+    每个 产品×问题层级×模型×联网 一行，一张表看全貌。
+    品类提及从原始应答文本匹配（仅Q3/Q4），其余从recommendation_detail分类结果统计。
+    """
+    config = _load_brand_config()
+    product_map = config.get("product_name_map", {})
+    cat_keywords = config.get("category_keywords", {})
+    brand_kw = config.get("brand_keywords", {})
+    generic_kw = config.get("generic_names", {})
+    competitor_brands = set(config.get("known_brand_competitors", []))
+    component_kw = config.get("component_keywords", [])
+
+    def _get_level(qid):
+        for tag in ["q3", "q4", "q5"]:
+            if f"_{tag}_" in qid:
+                return tag
+        return ""
+
+    def _classify(rec_product, cat_key):
+        if cat_key in brand_kw and any(kw in rec_product for kw in brand_kw[cat_key]):
+            return "999品牌"
+        for cb in competitor_brands:
+            if cb in rec_product:
+                return "竞品品牌"
+        for comp in component_kw:
+            if comp in rec_product:
+                return "成分品类级"
+        return "通用名"
+
+    # === 1. 统计品类提及（从原始应答文本，仅Q3/Q4） ===
+    category_hits = defaultdict(lambda: {"total": 0, "hit": 0})
+    for resp in responses:
+        qid = resp.get("question_id", "")
+        level = _get_level(qid)
+        if level not in ("q3", "q4"):
+            continue
+        product = resp.get("product", "")
+        cat_key = product_map.get(product)
+        if not cat_key or cat_key not in cat_keywords:
+            continue
+        model = resp.get("model", "")
+        search = "是" if resp.get("search_enabled") else "否"
+        answer = resp.get("answer", "")
+        gk = (product, "Q3/Q4", model, search)
+        category_hits[gk]["total"] += 1
+        if any(kw in answer for kw in cat_keywords[cat_key]):
+            category_hits[gk]["hit"] += 1
+
+    # === 2. 统计品牌/通用名/竞品（从recommendation_detail） ===
+    answer_totals = defaultdict(int)
+    for resp in responses:
+        qid = resp.get("question_id", "")
+        level = _get_level(qid)
+        if not level:
+            continue
+        product = resp.get("product", "")
+        model = resp.get("model", "")
+        search = "是" if resp.get("search_enabled") else "否"
+        level_group = "Q3/Q4" if level in ("q3", "q4") else "Q5"
+        answer_totals[(product, level_group, model, search)] += 1
+
+    type_counts = defaultdict(lambda: {
+        "999品牌_m": 0, "999品牌_r": 0,
+        "通用名_m": 0, "通用名_r": 0,
+        "竞品品牌_m": 0, "竞品品牌_r": 0,
+        "成分品类级_m": 0,
+    })
+    for _, row in detail_df.iterrows():
+        qid = row["问题ID"]
+        level = _get_level(qid)
+        if not level:
+            continue
+        product = row["产品"]
+        cat_key = product_map.get(product)
+        if not cat_key:
+            continue
+        model = row["模型"]
+        search = row["联网"]
+        level_group = "Q3/Q4" if level in ("q3", "q4") else "Q5"
+        gk = (product, level_group, model, search)
+
+        rec_product = str(row["推荐产品"])
+        nt = _classify(rec_product, cat_key)
+        is_rec = row["推荐强度"] in ("strong", "moderate")
+
+        type_counts[gk][f"{nt}_m"] += 1
+        if is_rec and nt != "成分品类级":
+            type_counts[gk][f"{nt}_r"] += 1
+
+    # === 3. 合并输出 ===
+    all_keys = set(answer_totals.keys()) | set(category_hits.keys())
+    rows = []
+    for gk in all_keys:
+        product, level_group, model, search = gk
+        total = answer_totals.get(gk, 0)
+        divisor = total if total > 0 else 1
+        tc = type_counts.get(gk, {})
+        ch = category_hits.get(gk, {})
+
+        row = {
+            "产品": product,
+            "问题层级": level_group,
+            "模型": model,
+            "联网": search,
+            "总回答数": total,
+        }
+
+        # 品类提及（仅Q3/Q4有值）
+        if level_group == "Q3/Q4" and ch:
+            row["品类提及率"] = round(ch["hit"] / ch["total"], 2) if ch["total"] else ""
+        else:
+            row["品类提及率"] = ""
+
+        # 各类型提及
+        row["999品牌提及次数"] = tc.get("999品牌_m", 0)
+        row["999品牌提及率"] = round(tc.get("999品牌_m", 0) / divisor, 3)
+        row["999品牌推荐率"] = round(tc.get("999品牌_r", 0) / divisor, 3)
+        row["通用名提及次数"] = tc.get("通用名_m", 0)
+        row["通用名提及率"] = round(tc.get("通用名_m", 0) / divisor, 3)
+        row["通用名推荐率"] = round(tc.get("通用名_r", 0) / divisor, 3)
+        row["竞品品牌提及次数"] = tc.get("竞品品牌_m", 0)
+        row["竞品品牌提及率"] = round(tc.get("竞品品牌_m", 0) / divisor, 3)
+        row["竞品品牌推荐率"] = round(tc.get("竞品品牌_r", 0) / divisor, 3)
+        row["成分品类级提及次数"] = tc.get("成分品类级_m", 0)
+
+        rows.append(row)
+
+    df = pd.DataFrame(rows)
+    df = df.sort_values(["产品", "问题层级", "模型", "联网"]).reset_index(drop=True)
+    path = os.path.join(ANALYSIS_DIR, "mention_report.csv")
+    df.to_csv(path, index=False, encoding="utf-8-sig")
+    print(f"  统一提及率报表 → {path} ({len(df)} 条)")
+
+
+def generate_competitor_type(detail_df: pd.DataFrame):
+    """
+    竞品类型分类（任务三）：
+    对rec_competitor_ranking.csv中的竞品标注为三类：
+    - 品牌竞品：命中yaml中known_brand_competitors
+    - 通用名竞品：具体药品的通用名
+    - 成分/品类级：命中yaml中component_keywords，不是具体产品
+    所有关键词来自brands.yaml，修改yaml后重跑即可。
+    输出 rec_competitor_ranking_typed.csv
+    """
+    config = _load_brand_config()
+    known_brands = set(config.get("known_brand_competitors", []))
+    component_kw = config.get("component_keywords", [])
+
+    ranking_path = os.path.join(ANALYSIS_DIR, "rec_competitor_ranking.csv")
+    if not os.path.exists(ranking_path):
+        print("  竞品排行文件不存在，跳过竞品类型标注")
+        return
+
+    ranking_df = pd.read_csv(ranking_path)
+
+    def _classify_competitor(name: str) -> str:
+        name = str(name).strip()
+        # 1. 品牌竞品：命中yaml中的已知品牌列表
+        for brand in known_brands:
+            if brand in name:
+                return "品牌竞品"
+        # 2. 成分/品类级：命中yaml中的成分关键词，且不含品牌特征
+        for comp in component_kw:
+            if comp in name:
+                return "成分/品类级"
+        # 3. 默认为通用名竞品
+        return "通用名竞品"
+
+    ranking_df["竞品类型"] = ranking_df["竞品"].apply(_classify_competitor)
+
+    path = os.path.join(ANALYSIS_DIR, "rec_competitor_ranking_typed.csv")
+    ranking_df.to_csv(path, index=False, encoding="utf-8-sig")
+    print(f"  竞品类型标注 → {path} ({len(ranking_df)} 条)")
+
+    type_counts = ranking_df["竞品类型"].value_counts()
+    for t, c in type_counts.items():
+        print(f"    {t}: {c}")
 
 
 if __name__ == "__main__":

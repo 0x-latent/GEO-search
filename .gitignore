@@ -8,3 +8,7 @@ __pycache__/
 .env
 .idea/
 .venv/
+*.7z
+*.xls
+*.xlsx
+results/extractions/

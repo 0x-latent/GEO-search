@@ -1,46 +1,65 @@
 使用流程
 
-  # 1. 复制并填写API key
+  # 0. 复制并填写API key
   cp config/api_keys.yaml.example config/api_keys.yaml
   # 编辑填入key
 
-  # 2. 问题已解析（40题）
+  # 1. 问题已解析（40题）
   # questions/questions_base.json 已生成
 
-  # 3. 生成问题变体（需要OpenAI key）
+  # 2. 生成问题变体（需要OpenAI key）
   python scripts/02_expand_questions.py
 
-  # 4. 在models.yaml中启用已到位的模型（enabled: true）
-  # 批量调用（支持断点续跑）
+  # 3. 批量调用AI模型采集应答（支持断点续跑）
+  #    在models.yaml中启用已到位的模型（enabled: true）
   python scripts/03_query_models.py
 
-  # 4.1 重跑单个问题（所有已启用模型）
+  # 3.1 重跑单个问题（所有已启用模型）
   python scripts/03_query_models.py --rerun yishanfu_q1_overall
-  # 4.2 重跑多个问题
+  # 3.2 重跑多个问题
   python scripts/03_query_models.py --rerun yishanfu_q1_overall ganmaolin_q2_detail
-  # 4.3 只重跑指定模型
+  # 3.3 只重跑指定模型
   python scripts/03_query_models.py --rerun yishanfu_q1_overall --models deepseek qwen
 
-  # 5. 生成分析报表
+  # 4. 基础统计分析（纯计算，不调LLM）
+  #    生成：raw_data.csv, mention_report.csv, category_mention_report.csv 等
   python scripts/04_analyze_results.py
 
-  # 5.1 llm提出推荐产品
-  python scripts/08_extract_recommendations.py
+  # 5. LLM提取推荐信息 + 统计报表（支持断点，已跑完的自动跳过）
+  #    生成：recommendation_detail.csv, brand_generic_detail/summary.csv,
+  #          rec_competitor_ranking_typed.csv 等
+  python scripts/05_extract_recommendations.py
 
   # 6. 提取品牌知识库（只做增量）
   python scripts/06_build_knowledge_base.py
-
   # 6.1 强制全部重跑
   python scripts/06_build_knowledge_base.py --force
 
-  # 7. 跑keyword校对（免费）
+  # 7. 知识准确率校验
+  # 7.1 跑keyword校对（免费）
   python scripts/07_verify_accuracy.py --mode keyword
-
-  # 7.1 跑LLM校对（5轮结果全量发送）
+  # 7.2 跑LLM校对（5轮结果全量发送）
   python scripts/07_verify_accuracy.py --mode llm
-
-  # 7.3 或者keyword+llm一起
+  # 7.3 keyword+llm一起
   python scripts/07_verify_accuracy.py --mode both
 
-  # 8. AI分析解读
-  python scripts/05_generate_report.py
+  # 8. AI分析解读（生成Markdown报告）
+  python scripts/08_generate_report.py
+
+
+脚本编号与产出对照
+
+  编号  脚本                            是否调LLM   主要产出
+  01    01_parse_questions.py           否          questions_base.json
+  02    02_expand_questions.py          是(OpenAI)  questions_expanded.json
+  03    03_query_models.py              是(4模型)   results/raw/*.json
+  04    04_analyze_results.py           否          raw_data.csv, mention_report.csv,
+                                                    category_mention_report.csv 等11张表
+  05    05_extract_recommendations.py   是(DeepSeek) recommendation_detail.csv,
+                                        断点续跑    brand_generic_detail.csv,
+                                                    brand_generic_summary.csv,
+                                                    rec_competitor_ranking_typed.csv 等
+  06    06_build_knowledge_base.py      是(DeepSeek) knowledge_base.json
+  07    07_verify_accuracy.py           可选        accuracy_keyword_verify.csv,
+                                                    accuracy_llm_verify.csv
+  08    08_generate_report.py           是(GPT)     Markdown分析报告

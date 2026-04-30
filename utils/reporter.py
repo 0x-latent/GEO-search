@@ -2,8 +2,18 @@
 CSV报表生成工具。
 """
 import os
+import yaml
 import pandas as pd
 from collections import Counter, defaultdict
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _load_brand_config():
+    """加载brands.yaml配置"""
+    path = os.path.join(BASE_DIR, "config", "brands.yaml")
+    with open(path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
 
 
 def generate_all_reports(parsed_results: list, output_dir: str):
@@ -22,6 +32,69 @@ def generate_all_reports(parsed_results: list, output_dir: str):
     generate_optimization_report(parsed_results, output_dir)   # 初版，08会覆盖
     generate_dashboard(parsed_results, output_dir)
     generate_optimization_report(parsed_results, output_dir)
+    # category_mention_report 和 mention_report 已合并到05脚本的统一提及率报表中
+
+
+def generate_category_mention_report(results: list, output_dir: str):
+    """
+    品类提及率报表（任务一）：
+    统计Q3/Q4应答中，AI是否提及我方产品所属品类。
+    使用brands.yaml中category_keywords配置进行关键词匹配。
+    """
+    config = _load_brand_config()
+    cat_keywords = config.get("category_keywords", {})
+    if not cat_keywords:
+        print("警告: brands.yaml中未找到category_keywords配置，跳过品类提及率报表")
+        return
+
+    # 产品名映射：直接使用yaml中的product_name_map
+    product_name_map = config.get("product_name_map", {})
+    product_to_cat_key = {}
+    for short_name, std_name in product_name_map.items():
+        if std_name in cat_keywords:
+            product_to_cat_key[short_name] = std_name
+            product_to_cat_key[std_name] = std_name
+
+    # 筛选Q3/Q4，按 产品×模型×联网 分组
+    groups = defaultdict(lambda: {"total": 0, "hit": 0})
+    for r in results:
+        level = r.get("level", "")
+        if not (level.startswith("q3") or level.startswith("q4")):
+            continue
+
+        product = r.get("product", "")
+        cat_key = product_to_cat_key.get(product)
+        if not cat_key:
+            continue
+
+        model = r.get("model", "")
+        search = r.get("search_enabled", False)
+        answer = r.get("answer", "")
+
+        gk = (product, model, search)
+        groups[gk]["total"] += 1
+
+        # 检查品类关键词是否命中
+        keywords = cat_keywords[cat_key]
+        if any(kw in answer for kw in keywords):
+            groups[gk]["hit"] += 1
+
+    rows = []
+    for (product, model, search), g in groups.items():
+        rows.append({
+            "产品": product,
+            "模型": model,
+            "联网": "是" if search else "否",
+            "Q3Q4总回答数": g["total"],
+            "品类提及次数": g["hit"],
+            "品类提及率": round(g["hit"] / g["total"], 2) if g["total"] else 0,
+        })
+
+    df = pd.DataFrame(rows)
+    df = df.sort_values(["产品", "模型", "联网"]).reset_index(drop=True)
+    path = os.path.join(output_dir, "category_mention_report.csv")
+    df.to_csv(path, index=False, encoding="utf-8-sig")
+    print(f"品类提及率报表 → {path}")
 
 
 def generate_mention_report(results: list, output_dir: str):
