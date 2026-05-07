@@ -33,11 +33,13 @@ def _build_search_patterns(brand_config: dict) -> list:
         if short and short not in [brand] + aliases:
             patterns.append((short, brand, "999", info.get("category", "")))
 
-    # 竞品
-    for brand, info in brand_config.get("competitors", {}).items():
-        aliases = info.get("aliases", [])
-        for name in [brand] + aliases:
-            patterns.append((name, brand, "competitor", info.get("category", "")))
+    # 品牌竞品
+    for name in brand_config.get("known_brand_competitors", []):
+        patterns.append((name, name, "competitor", ""))
+
+    # 通用名竞品
+    for name in brand_config.get("generic_names", []):
+        patterns.append((name, name, "competitor", ""))
 
     # 按名称长度降序（优先匹配更长的名称，避免短名误匹配）
     patterns.sort(key=lambda x: len(x[0]), reverse=True)

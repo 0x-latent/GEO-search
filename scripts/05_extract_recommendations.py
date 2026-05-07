@@ -228,34 +228,6 @@ async def main():
         detail_df.to_csv(detail_path, index=False, encoding="utf-8-sig")
         print(f"\n推荐提取明细 → {detail_path} ({len(detail_rows)} 条)")
 
-        # 汇总
-        summary = defaultdict(lambda: {"strong": 0, "moderate": 0, "mention": 0, "caution": 0, "total": 0})
-        for row in detail_rows:
-            key = (row["产品"], row["模型"], row["推荐产品"])
-            strength = row["推荐强度"]
-            summary[key]["total"] += 1
-            if strength in summary[key]:
-                summary[key][strength] += 1
-
-        sum_rows = []
-        for (product, model, rec_product), counts in summary.items():
-            sum_rows.append({
-                "场景产品": product,
-                "模型": model,
-                "被推荐产品": rec_product,
-                "强推荐次数": counts["strong"],
-                "可选次数": counts["moderate"],
-                "仅提及次数": counts["mention"],
-                "警告次数": counts["caution"],
-                "总出现次数": counts["total"],
-            })
-
-        sum_df = pd.DataFrame(sum_rows)
-        sum_df = sum_df.sort_values(["场景产品", "模型", "总出现次数"], ascending=[True, True, False])
-        sum_path = os.path.join(ANALYSIS_DIR, "recommendation_extracted_summary.csv")
-        sum_df.to_csv(sum_path, index=False, encoding="utf-8-sig")
-        print(f"推荐提取汇总 → {sum_path}")
-
         # 生成统计分析报表
         print("\n生成统计分析...")
         generate_statistics(detail_df, responses)
@@ -263,128 +235,221 @@ async def main():
         print("\n更新04报表（基于LLM提取数据覆盖正则版本）...")
         generate_updated_dashboard(detail_df, responses)
         generate_updated_stability(detail_df, responses)
-        generate_updated_competitor(detail_df)
         generate_updated_search_diff(detail_df, responses)
         generate_updated_optimization(detail_df, responses)
 
         print("\nV6框架补充报表...")
         generate_brand_generic_split(detail_df, responses)
         generate_unified_mention_report(detail_df, responses)
-        generate_competitor_type(detail_df)
     else:
         print("未提取到任何推荐信息")
 
     print(f"\n完成: 处理 {counter['done']}条, 跳过 {counter['skip']}条, 失败 {counter['fail']}条, 提取 {len(detail_rows)} 条推荐")
 
 
+def _load_brand_matchers():
+    """从brands.yaml加载产品匹配表，返回 (999匹配列表, 竞品匹配列表)。
+    每个匹配项为 (关键词, 标准名)，按关键词长度降序排列（优先匹配更长的名称）。
+    数据来源：
+      - 999: brand_999 (名称+aliases)
+      - 竞品: known_brand_competitors + generic_names
+    """
+    config_path = os.path.join(BASE_DIR, "config", "brands.yaml")
+    with open(config_path, "r", encoding="utf-8") as f:
+        cfg = yaml.safe_load(f)
+
+    matchers_999 = []  # [(关键词, 标准名), ...]
+    for name, info in cfg.get("brand_999", {}).items():
+        matchers_999.append((name, name))
+        for alias in info.get("aliases", []):
+            matchers_999.append((alias, name))
+
+    matchers_comp = []  # [(关键词, 标准名), ...]
+    for name in cfg.get("known_brand_competitors", []):
+        matchers_comp.append((name, name))
+    for name in cfg.get("generic_names", []):
+        matchers_comp.append((name, name))
+
+    # 按关键词长度降序，优先匹配更长的名称
+    matchers_999.sort(key=lambda x: len(x[0]), reverse=True)
+    matchers_comp.sort(key=lambda x: len(x[0]), reverse=True)
+    return matchers_999, matchers_comp
+
+
+# 模块级缓存，首次调用时加载
+_MATCHERS_999 = None
+_MATCHERS_COMP = None
+
+
+def _get_matchers():
+    global _MATCHERS_999, _MATCHERS_COMP
+    if _MATCHERS_999 is None:
+        _MATCHERS_999, _MATCHERS_COMP = _load_brand_matchers()
+    return _MATCHERS_999, _MATCHERS_COMP
+
+
+def _match_products(name: str) -> tuple:
+    """对推荐产品名做子串匹配，返回 (matched_999: set, matched_comp: set)。
+    一条推荐产品可能同时命中999产品和竞品（如 '布洛芬（如"芬必得"）'）。
+    使用位置级最长匹配：如果短关键词（如"泰诺"）的每次出现都被更长关键词
+    （如"泰诺林"）完全覆盖，则该短关键词不计入结果。
+    """
+    matchers_999, matchers_comp = _get_matchers()
+
+    # 第一步：找出所有匹配及其位置 [(start, end, std_name, type), ...]
+    hits = []
+    for kw, std_name in matchers_999:
+        start = 0
+        while True:
+            pos = name.find(kw, start)
+            if pos == -1:
+                break
+            hits.append((pos, pos + len(kw), std_name, "999"))
+            start = pos + 1
+    for kw, std_name in matchers_comp:
+        start = 0
+        while True:
+            pos = name.find(kw, start)
+            if pos == -1:
+                break
+            hits.append((pos, pos + len(kw), std_name, "comp"))
+            start = pos + 1
+
+    # 第二步：位置级去重——如果某次命中被另一个更长的命中完全覆盖，则丢弃
+    # 按区间长度降序，长的优先保留
+    hits.sort(key=lambda x: -(x[1] - x[0]))
+    kept = []
+    for h in hits:
+        covered = any(k[0] <= h[0] and k[1] >= h[1] and (k[1] - k[0]) > (h[1] - h[0])
+                       for k in kept)
+        if not covered:
+            kept.append(h)
+
+    matched_999 = set(h[2] for h in kept if h[3] == "999")
+    matched_comp = set(h[2] for h in kept if h[3] == "comp")
+    return matched_999, matched_comp
+
+
 def _is_999_product(name: str) -> bool:
-    """判断产品名是否属于999品牌"""
-    keywords = ["999", "三九", "感冒灵", "皮炎平", "养胃舒", "胃泰",
-                "抗病毒口服液", "小儿氨酚黄那敏", "强力枇杷露",
-                "澳诺", "葡萄糖酸锌钙", "易善复", "多烯磷脂酰胆碱"]
-    return any(kw in name for kw in keywords)
+    """判断产品名是否属于999品牌（基于brands.yaml子串匹配）"""
+    matched_999, _ = _match_products(name)
+    return len(matched_999) > 0
 
 
 def generate_statistics(detail_df: pd.DataFrame, responses: list):
-    """基于提取明细生成统计分析报表"""
+    """基于提取明细生成统计分析报表。
+    输出：
+      - rec_overview.csv    统一推荐总览（999本品+品牌竞品+通用名，口径一致）
+      - rec_reasons.csv     推荐理由分析
+    """
+    config = _load_brand_config()
+    known_brands = set(config.get("known_brand_competitors", []))
+    generic_names = set(config.get("generic_names", []))
+    component_kw = config.get("component_keywords", [])
 
-    # ===== 1. 999推荐总览 =====
-    # 以原始应答为基数，统计每个产品×模型×联网下999的推荐情况
-    # 先构建应答级别的汇总（每条应答中999是否被推荐、排名多少）
-    resp_index = {}
+    def _classify_name(name: str) -> str:
+        """分类：999品牌 / 品牌竞品 / 通用名 / 成分品类级 / 未识别"""
+        for b in known_brands:
+            if b in name:
+                return "品牌竞品"
+        for g in generic_names:
+            if g in name:
+                return "通用名"
+        for c in component_kw:
+            if c in name:
+                return "成分品类级"
+        return "未识别"
+
+    _strength_order = {"strong": 3, "moderate": 2, "mention": 1, "caution": 0}
+
+    # ===== 1. 统一推荐总览 =====
+    # 统一口径：按应答去重，每条应答中同一标准产品名只计1次，取最高强度
+    # 维度：产品 × 模型 × 联网 × 被推荐产品 × 名称类型
+
+    # 第一步：构建应答总数基数（产品×模型×联网）
+    answer_totals = defaultdict(int)  # {(产品, 模型, 联网): 应答总数}
     for resp in responses:
-        key = f"{resp.get('question_id', '')}_{resp.get('model', '')}_{resp.get('search_enabled', '')}_{resp.get('round', '')}"
-        resp_index[key] = resp
-
-    # 每条应答的999推荐情况
-    answer_999 = defaultdict(lambda: {"has_strong": False, "has_any": False, "best_rank": None})
-    for _, row in detail_df.iterrows():
-        ans_key = f"{row['问题ID']}_{row['模型']}_{row['联网'] == '是'}_{row['轮次']}"
-        if _is_999_product(row["推荐产品"]):
-            info = answer_999[ans_key]
-            info["has_any"] = True
-            if row["推荐强度"] == "strong":
-                info["has_strong"] = True
-            rank = row["推荐排名"]
-            if isinstance(rank, (int, float)) and (info["best_rank"] is None or rank < info["best_rank"]):
-                info["best_rank"] = rank
-
-    # 按产品×模型×联网聚合
-    overview_groups = defaultdict(lambda: {"total": 0, "strong_count": 0, "any_count": 0, "ranks": []})
-    for resp in responses:
-        key = f"{resp.get('question_id', '')}_{resp.get('model', '')}_{resp.get('search_enabled', '')}_{resp.get('round', '')}"
         product = resp.get("product", "")
         model = resp.get("model", "")
         search = "是" if resp.get("search_enabled") else "否"
-        gk = (product, model, search)
-        overview_groups[gk]["total"] += 1
+        answer_totals[(product, model, search)] += 1
 
-        info = answer_999.get(key, {})
-        if info.get("has_strong"):
-            overview_groups[gk]["strong_count"] += 1
-        if info.get("has_any"):
-            overview_groups[gk]["any_count"] += 1
-        if info.get("best_rank") is not None:
-            overview_groups[gk]["ranks"].append(info["best_rank"])
-
-    overview_rows = []
-    for (product, model, search), g in overview_groups.items():
-        total = g["total"]
-        ranks = g["ranks"]
-        overview_rows.append({
-            "产品": product,
-            "模型": model,
-            "联网": search,
-            "应答总数": total,
-            "999强推荐次数": g["strong_count"],
-            "999强推荐率": round(g["strong_count"] / total, 3) if total else 0,
-            "999被提及次数": g["any_count"],
-            "999提及率": round(g["any_count"] / total, 3) if total else 0,
-            "999平均排名": round(sum(ranks) / len(ranks), 2) if ranks else "",
-            "999最佳排名": min(ranks) if ranks else "",
-        })
-
-    overview_df = pd.DataFrame(overview_rows)
-    overview_df = overview_df.sort_values(["产品", "模型", "联网"]).reset_index(drop=True)
-    path = os.path.join(ANALYSIS_DIR, "rec_999_overview.csv")
-    overview_df.to_csv(path, index=False, encoding="utf-8-sig")
-    print(f"  999推荐总览 → {path}")
-
-    # ===== 2. 竞品推荐排行 =====
-    # 每个场景产品×模型下，被推荐最多的Top15竞品
-    comp_groups = defaultdict(lambda: defaultdict(lambda: {"strong": 0, "moderate": 0, "total": 0}))
+    # 第二步：按应答聚合每个标准产品名的最高强度
+    # answer_products[应答key] = {标准产品名: (最高强度, 名称类型)}
+    answer_products = defaultdict(dict)
     for _, row in detail_df.iterrows():
-        if _is_999_product(row["推荐产品"]):
-            continue
-        key = (row["产品"], row["模型"])
-        rec = row["推荐产品"]
-        comp_groups[key][rec]["total"] += 1
-        if row["推荐强度"] == "strong":
-            comp_groups[key][rec]["strong"] += 1
-        elif row["推荐强度"] == "moderate":
-            comp_groups[key][rec]["moderate"] += 1
+        rec_raw = str(row["推荐产品"])
+        matched_999, matched_comp = _match_products(rec_raw)
+        ans_key = (row["产品"], row["模型"], row["联网"],
+                   f"{row['问题ID']}_{row['轮次']}")
+        new_s = row["推荐强度"]
 
-    comp_rows = []
-    for (product, model), recs in comp_groups.items():
-        sorted_recs = sorted(recs.items(), key=lambda x: x[1]["total"], reverse=True)[:15]
-        for rank, (rec_name, counts) in enumerate(sorted_recs, 1):
-            comp_rows.append({
-                "场景产品": product,
+        # 999产品
+        for std_name in matched_999:
+            cur = answer_products[ans_key].get(std_name)
+            if cur is None or _strength_order.get(new_s, 0) > _strength_order.get(cur[0], 0):
+                answer_products[ans_key][std_name] = (new_s, "999品牌")
+
+        # 竞品（品牌竞品 / 通用名）
+        for std_name in matched_comp:
+            name_type = _classify_name(std_name)
+            cur = answer_products[ans_key].get(std_name)
+            if cur is None or _strength_order.get(new_s, 0) > _strength_order.get(cur[0], 0):
+                answer_products[ans_key][std_name] = (new_s, name_type)
+
+        # 未命中任何已知产品 → 保留原文
+        if not matched_999 and not matched_comp:
+            fallback = rec_raw.strip()
+            name_type = _classify_name(fallback)
+            cur = answer_products[ans_key].get(fallback)
+            if cur is None or _strength_order.get(new_s, 0) > _strength_order.get(cur[0], 0):
+                answer_products[ans_key][fallback] = (new_s, name_type)
+
+    # 第三步：按 (产品, 模型, 联网, 被推荐产品, 名称类型) 聚合
+    rec_groups = defaultdict(lambda: {"strong": 0, "moderate": 0, "total": 0})
+    for (product, model, search, _ak), recs in answer_products.items():
+        for rec_name, (strength, name_type) in recs.items():
+            gk = (product, model, search, rec_name, name_type)
+            rec_groups[gk]["total"] += 1
+            if strength == "strong":
+                rec_groups[gk]["strong"] += 1
+            elif strength == "moderate":
+                rec_groups[gk]["moderate"] += 1
+
+    # 第四步：输出，每个 (产品, 模型, 联网) 内按总出现次数降序排名
+    overview_rows = []
+    # 按 (产品, 模型, 联网) 分组排名
+    group_recs = defaultdict(list)
+    for (product, model, search, rec_name, name_type), counts in rec_groups.items():
+        group_recs[(product, model, search)].append((rec_name, name_type, counts))
+
+    for (product, model, search), recs in group_recs.items():
+        total_answers = answer_totals.get((product, model, search), 0)
+        sorted_recs = sorted(recs, key=lambda x: x[2]["total"], reverse=True)
+        for rank, (rec_name, name_type, counts) in enumerate(sorted_recs, 1):
+            overview_rows.append({
+                "产品": product,
                 "模型": model,
+                "联网": search,
+                "应答总数": total_answers,
                 "排名": rank,
-                "竞品": rec_name,
+                "被推荐产品": rec_name,
+                "名称类型": name_type,
+                "提及次数": counts["total"],
+                "提及率": round(counts["total"] / total_answers, 3) if total_answers else 0,
                 "强推荐次数": counts["strong"],
+                "强推荐率": round(counts["strong"] / total_answers, 3) if total_answers else 0,
                 "可选次数": counts["moderate"],
-                "总出现次数": counts["total"],
             })
 
-    comp_df = pd.DataFrame(comp_rows)
-    path = os.path.join(ANALYSIS_DIR, "rec_competitor_ranking.csv")
-    comp_df.to_csv(path, index=False, encoding="utf-8-sig")
-    print(f"  竞品推荐排行 → {path}")
+    overview_df = pd.DataFrame(overview_rows)
+    overview_df = overview_df.sort_values(
+        ["产品", "模型", "联网", "排名"]).reset_index(drop=True)
+    path = os.path.join(ANALYSIS_DIR, "rec_overview.csv")
+    overview_df.to_csv(path, index=False, encoding="utf-8-sig")
+    print(f"  统一推荐总览 → {path} ({len(overview_df)} 条)")
 
-    # ===== 3. 推荐理由分析 =====
-    # 999 vs 竞品的推荐理由高频词
+    # ===== 2. 推荐理由分析 =====
     from collections import Counter
     reasons_999 = []
     reasons_comp = []
@@ -398,12 +463,9 @@ def generate_statistics(detail_df: pd.DataFrame, responses: list):
             reasons_comp.append(reason)
 
     reason_rows = []
-    # 999产品的推荐理由
     reason_counter_999 = Counter(reasons_999)
     for reason, count in reason_counter_999.most_common(30):
         reason_rows.append({"类型": "999产品", "推荐理由": reason, "出现次数": count})
-
-    # 竞品的推荐理由
     reason_counter_comp = Counter(reasons_comp)
     for reason, count in reason_counter_comp.most_common(30):
         reason_rows.append({"类型": "竞品", "推荐理由": reason, "出现次数": count})
@@ -412,61 +474,6 @@ def generate_statistics(detail_df: pd.DataFrame, responses: list):
     path = os.path.join(ANALYSIS_DIR, "rec_reasons.csv")
     reason_df.to_csv(path, index=False, encoding="utf-8-sig")
     print(f"  推荐理由分析 → {path}")
-
-    # ===== 4. 联网影响分析 =====
-    # 对比联网和不联网下999的推荐变化
-    search_groups = defaultdict(lambda: {"nosearch": {"total": 0, "strong": 0, "any": 0, "ranks": []},
-                                          "search": {"total": 0, "strong": 0, "any": 0, "ranks": []}})
-    for resp in responses:
-        product = resp.get("product", "")
-        model = resp.get("model", "")
-        mode = "search" if resp.get("search_enabled") else "nosearch"
-        key = f"{resp.get('question_id', '')}_{resp.get('model', '')}_{resp.get('search_enabled', '')}_{resp.get('round', '')}"
-
-        gk = (product, model)
-        search_groups[gk][mode]["total"] += 1
-
-        info = answer_999.get(key, {})
-        if info.get("has_strong"):
-            search_groups[gk][mode]["strong"] += 1
-        if info.get("has_any"):
-            search_groups[gk][mode]["any"] += 1
-        if info.get("best_rank") is not None:
-            search_groups[gk][mode]["ranks"].append(info["best_rank"])
-
-    impact_rows = []
-    for (product, model), modes in search_groups.items():
-        ns = modes["nosearch"]
-        s = modes["search"]
-        if ns["total"] == 0 or s["total"] == 0:
-            continue
-
-        ns_strong_rate = round(ns["strong"] / ns["total"], 3)
-        s_strong_rate = round(s["strong"] / s["total"], 3)
-        ns_any_rate = round(ns["any"] / ns["total"], 3)
-        s_any_rate = round(s["any"] / s["total"], 3)
-        ns_avg_rank = round(sum(ns["ranks"]) / len(ns["ranks"]), 2) if ns["ranks"] else ""
-        s_avg_rank = round(sum(s["ranks"]) / len(s["ranks"]), 2) if s["ranks"] else ""
-
-        impact_rows.append({
-            "产品": product,
-            "模型": model,
-            "不联网_强推荐率": ns_strong_rate,
-            "联网_强推荐率": s_strong_rate,
-            "强推荐率变化": round(s_strong_rate - ns_strong_rate, 3),
-            "不联网_提及率": ns_any_rate,
-            "联网_提及率": s_any_rate,
-            "提及率变化": round(s_any_rate - ns_any_rate, 3),
-            "不联网_平均排名": ns_avg_rank,
-            "联网_平均排名": s_avg_rank,
-        })
-
-    if impact_rows:
-        impact_df = pd.DataFrame(impact_rows)
-        impact_df = impact_df.sort_values(["产品", "模型"]).reset_index(drop=True)
-        path = os.path.join(ANALYSIS_DIR, "rec_search_impact.csv")
-        impact_df.to_csv(path, index=False, encoding="utf-8-sig")
-        print(f"  联网影响分析 → {path}")
 
 
 def generate_updated_dashboard(detail_df: pd.DataFrame, responses: list):
@@ -519,12 +526,20 @@ def generate_updated_dashboard(detail_df: pd.DataFrame, responses: list):
             if info.get("best_rank") is not None:
                 groups[gk][m]["ranks"].append(info["best_rank"])
 
-    # 竞品统计（从detail_df中提取）
+    # 竞品统计（从detail_df中提取，用_match_products归一化）
     for _, row in detail_df.iterrows():
-        if _is_999_product(row["推荐产品"]):
-            continue
+        rec_raw = str(row["推荐产品"])
+        _, matched_comp = _match_products(rec_raw)
+        if not matched_comp:
+            # 未命中999也未命中竞品 → 保留原文
+            matched_999, _ = _match_products(rec_raw)
+            if not matched_999:
+                matched_comp = {rec_raw.strip()}
+            else:
+                continue
         gk = (row["产品"], row["模型"])
-        groups[gk]["competitors"][row["推荐产品"]] += 1
+        for comp_name in matched_comp:
+            groups[gk]["competitors"][comp_name] += 1
 
     # 生成Dashboard
     rows = []
@@ -663,43 +678,22 @@ def generate_updated_stability(detail_df: pd.DataFrame, responses: list):
 
     df = pd.DataFrame(rows)
     df = df.sort_values(["产品", "模型", "联网", "问题ID"]).reset_index(drop=True)
+
+    # 合并 answer_similarity（04脚本生成的TF-IDF相似度）
+    sim_path = os.path.join(ANALYSIS_DIR, "answer_similarity.csv")
+    if os.path.exists(sim_path):
+        sim_df = pd.read_csv(sim_path)
+        # answer_similarity 的 key 是 问题ID×模型×联网
+        sim_cols = {"TF-IDF相似度": "TF-IDF相似度", "平均字数": "平均字数", "字数标准差": "字数标准差"}
+        sim_df = sim_df.rename(columns=sim_cols)
+        df = df.merge(
+            sim_df[["问题ID", "模型", "联网", "TF-IDF相似度", "平均字数", "字数标准差"]],
+            on=["问题ID", "模型", "联网"], how="left"
+        )
+
     path = os.path.join(ANALYSIS_DIR, "stability_report.csv")
     df.to_csv(path, index=False, encoding="utf-8-sig")
-    print(f"  稳定性报表已更新（基于LLM提取数据） → {path}")
-
-
-def generate_updated_competitor(detail_df: pd.DataFrame):
-    """
-    基于LLM提取数据覆盖竞品图谱。
-    比04的keyword版本更准确：LLM能识别正则匹配不到的产品名。
-    """
-    rows = []
-    groups = defaultdict(lambda: defaultdict(int))
-
-    for _, row in detail_df.iterrows():
-        if _is_999_product(row["推荐产品"]):
-            continue
-        groups[row["产品"]][row["推荐产品"]] += 1
-
-    # 计算每个产品的总应答数（用于出现率）
-    product_totals = detail_df.groupby("产品").apply(
-        lambda x: x.drop_duplicates(subset=["问题ID", "模型", "联网", "轮次"]).shape[0]
-    ).to_dict()
-
-    for product, competitors in groups.items():
-        total = product_totals.get(product, 1)
-        for comp, count in sorted(competitors.items(), key=lambda x: -x[1]):
-            rows.append({
-                "产品": product,
-                "竞品": comp,
-                "出现次数": count,
-                "出现率": round(count / total, 3),
-            })
-
-    df = pd.DataFrame(rows)
-    path = os.path.join(ANALYSIS_DIR, "competitor_report.csv")
-    df.to_csv(path, index=False, encoding="utf-8-sig")
-    print(f"  竞品图谱已更新（基于LLM提取数据） → {path}")
+    print(f"  稳定性报表已更新（含TF-IDF相似度） → {path}")
 
 
 def generate_updated_search_diff(detail_df: pd.DataFrame, responses: list):
@@ -949,9 +943,13 @@ def generate_brand_generic_split(detail_df: pd.DataFrame, responses: list):
     输出 brand_generic_detail.csv（全量明细） + brand_generic_summary.csv（999产品汇总）
     """
     config = _load_brand_config()
-    brand_kw = config.get("brand_keywords", {})
-    generic_kw = config.get("generic_names", {})
+    # 从brand_999构建999品牌关键词（名称+所有aliases）
+    brand_999_keywords = []
+    for name, info in config.get("brand_999", {}).items():
+        brand_999_keywords.append(name)
+        brand_999_keywords.extend(info.get("aliases", []))
     competitor_brands = set(config.get("known_brand_competitors", []))
+    generic_names = set(config.get("generic_names", []))
     component_kw = config.get("component_keywords", [])
     product_map = _build_product_name_map()
 
@@ -964,13 +962,13 @@ def generate_brand_generic_split(detail_df: pd.DataFrame, responses: list):
     def _classify(rec_product: str, cat_key: str) -> str:
         """
         返回名称类型。优先级：
-        1. 999品牌：命中B0品牌关键词（含999/三九等品牌标识）
+        1. 999品牌：命中brand_999关键词
         2. 竞品品牌：命中known_brand_competitors
-        3. 通用名：命中B2通用名，或以上都没命中的默认值
-        4. 成分品类级：命中component_keywords
+        3. 成分品类级：命中component_keywords
+        4. 通用名：命中generic_names，或以上都没命中的默认值
         """
         # === 1. 999品牌 ===
-        if cat_key in brand_kw and any(kw in rec_product for kw in brand_kw[cat_key]):
+        if any(kw in rec_product for kw in brand_999_keywords):
             return "999品牌"
 
         # === 2. 竞品品牌 ===
@@ -983,7 +981,7 @@ def generate_brand_generic_split(detail_df: pd.DataFrame, responses: list):
             if comp in rec_product:
                 return "成分品类级"
 
-        # === 4. 通用名（命中B2的，或默认） ===
+        # === 4. 通用名 ===
         return "通用名"
 
     detail_rows = []
@@ -1069,33 +1067,7 @@ def generate_brand_generic_split(detail_df: pd.DataFrame, responses: list):
         elif nt == "成分品类级":
             summary_groups[gk]["component_m"] += 1
 
-    summary_rows = []
-    for (product, level_group, model, search), g in summary_groups.items():
-        total = answer_totals.get((product, level_group, model, search), 0)
-        divisor = total if total > 0 else 1
-        summary_rows.append({
-            "产品": product,
-            "问题层级分组": level_group,
-            "模型": model,
-            "联网": search,
-            "总回答数": total,
-            "999品牌提及次数": g["999brand_m"],
-            "999品牌提及率": round(g["999brand_m"] / divisor, 3),
-            "999品牌推荐率": round(g["999brand_r"] / divisor, 3),
-            "通用名提及次数": g["generic_m"],
-            "通用名提及率": round(g["generic_m"] / divisor, 3),
-            "通用名推荐率": round(g["generic_r"] / divisor, 3),
-            "竞品品牌提及次数": g["compbrand_m"],
-            "竞品品牌提及率": round(g["compbrand_m"] / divisor, 3),
-            "竞品品牌推荐率": round(g["compbrand_r"] / divisor, 3),
-            "成分品类级提及次数": g["component_m"],
-        })
-
-    summary_df = pd.DataFrame(summary_rows)
-    summary_df = summary_df.sort_values(["产品", "问题层级分组", "模型", "联网"]).reset_index(drop=True)
-    path = os.path.join(ANALYSIS_DIR, "brand_generic_summary.csv")
-    summary_df.to_csv(path, index=False, encoding="utf-8-sig")
-    print(f"  推荐产品分类汇总 → {path}")
+    # brand_generic_summary 已合并到 mention_report，不再单独输出
 
 
 def generate_unified_mention_report(detail_df: pd.DataFrame, responses: list):
@@ -1107,8 +1079,11 @@ def generate_unified_mention_report(detail_df: pd.DataFrame, responses: list):
     config = _load_brand_config()
     product_map = config.get("product_name_map", {})
     cat_keywords = config.get("category_keywords", {})
-    brand_kw = config.get("brand_keywords", {})
-    generic_kw = config.get("generic_names", {})
+    # 从brand_999构建999品牌关键词
+    brand_999_keywords = []
+    for name, info in config.get("brand_999", {}).items():
+        brand_999_keywords.append(name)
+        brand_999_keywords.extend(info.get("aliases", []))
     competitor_brands = set(config.get("known_brand_competitors", []))
     component_kw = config.get("component_keywords", [])
 
@@ -1119,7 +1094,7 @@ def generate_unified_mention_report(detail_df: pd.DataFrame, responses: list):
         return ""
 
     def _classify(rec_product, cat_key):
-        if cat_key in brand_kw and any(kw in rec_product for kw in brand_kw[cat_key]):
+        if any(kw in rec_product for kw in brand_999_keywords):
             return "999品牌"
         for cb in competitor_brands:
             if cb in rec_product:
@@ -1232,51 +1207,6 @@ def generate_unified_mention_report(detail_df: pd.DataFrame, responses: list):
     path = os.path.join(ANALYSIS_DIR, "mention_report.csv")
     df.to_csv(path, index=False, encoding="utf-8-sig")
     print(f"  统一提及率报表 → {path} ({len(df)} 条)")
-
-
-def generate_competitor_type(detail_df: pd.DataFrame):
-    """
-    竞品类型分类（任务三）：
-    对rec_competitor_ranking.csv中的竞品标注为三类：
-    - 品牌竞品：命中yaml中known_brand_competitors
-    - 通用名竞品：具体药品的通用名
-    - 成分/品类级：命中yaml中component_keywords，不是具体产品
-    所有关键词来自brands.yaml，修改yaml后重跑即可。
-    输出 rec_competitor_ranking_typed.csv
-    """
-    config = _load_brand_config()
-    known_brands = set(config.get("known_brand_competitors", []))
-    component_kw = config.get("component_keywords", [])
-
-    ranking_path = os.path.join(ANALYSIS_DIR, "rec_competitor_ranking.csv")
-    if not os.path.exists(ranking_path):
-        print("  竞品排行文件不存在，跳过竞品类型标注")
-        return
-
-    ranking_df = pd.read_csv(ranking_path)
-
-    def _classify_competitor(name: str) -> str:
-        name = str(name).strip()
-        # 1. 品牌竞品：命中yaml中的已知品牌列表
-        for brand in known_brands:
-            if brand in name:
-                return "品牌竞品"
-        # 2. 成分/品类级：命中yaml中的成分关键词，且不含品牌特征
-        for comp in component_kw:
-            if comp in name:
-                return "成分/品类级"
-        # 3. 默认为通用名竞品
-        return "通用名竞品"
-
-    ranking_df["竞品类型"] = ranking_df["竞品"].apply(_classify_competitor)
-
-    path = os.path.join(ANALYSIS_DIR, "rec_competitor_ranking_typed.csv")
-    ranking_df.to_csv(path, index=False, encoding="utf-8-sig")
-    print(f"  竞品类型标注 → {path} ({len(ranking_df)} 条)")
-
-    type_counts = ranking_df["竞品类型"].value_counts()
-    for t, c in type_counts.items():
-        print(f"    {t}: {c}")
 
 
 if __name__ == "__main__":
