@@ -1,0 +1,21 @@
+services:
+  geo-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: geo-search-workbench:latest
+    ports:
+      - "8000:8000"
+    environment:
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+    volumes:
+      - ./config/api_keys.yaml:/app/config/api_keys.yaml:ro
+      - ./config/brands.yaml:/app/config/brands.yaml
+      - ./config/knowledge_base.json:/app/config/knowledge_base.json
+      - ./questions:/app/questions
+      - ./docs/products_db:/app/docs/products_db
+      - ./results:/app/results
+      - ./backend/data:/app/backend/data
+    restart: unless-stopped
+

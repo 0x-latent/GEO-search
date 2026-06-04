@@ -29,6 +29,17 @@ def load_questions_map() -> dict:
             for q in questions:
                 qmap[q["id"]] = q
             break
+
+    imported_pattern = os.path.join(BASE_DIR, "questions", "imported_questions*.json")
+    for path in glob.glob(imported_pattern):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                questions = json.load(f)
+            for q in questions:
+                if "id" in q:
+                    qmap[q["id"]] = q
+        except Exception as e:
+            print(f"跳过无法解析的导入问题映射: {path} ({e})")
     return qmap
 
 

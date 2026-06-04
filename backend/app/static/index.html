@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GEO 数据看板</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark">G</span>
+        <div>
+          <strong>GEO 数据看板</strong>
+          <small>SQLite 统一数据源</small>
+        </div>
+      </div>
+      <nav class="nav-tabs" aria-label="看板视图">
+        <button class="nav active" data-tab="overview">总览</button>
+        <button class="nav" data-tab="coverage">产品覆盖</button>
+        <button class="nav" data-tab="models">模型表现</button>
+        <button class="nav" data-tab="splits">拆分表现</button>
+        <button class="nav" data-tab="sources">信源</button>
+        <button class="nav" data-tab="assets">数据资产</button>
+        <button class="nav" data-tab="samples">回答样本</button>
+      </nav>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div>
+          <h1 id="view-title">总览</h1>
+          <p id="view-subtitle">查看两套数据在同一 SQLite 标准下的样本规模、覆盖范围和信源结构。</p>
+        </div>
+        <div class="toolbar">
+          <label>
+            数据集
+            <select id="dataset-select">
+              <option value="all">全部数据集</option>
+            </select>
+          </label>
+          <button id="refresh" class="primary">刷新</button>
+        </div>
+      </header>
+
+      <section id="status" class="status" hidden></section>
+
+      <section id="overview" class="view active">
+        <div id="kpis" class="kpis"></div>
+        <div class="layout two">
+          <section class="panel">
+            <div class="panel-title">
+              <h2>数据集概况</h2>
+              <span>问题、回答、产品、模型和外部表</span>
+            </div>
+            <div id="dataset-table" class="table-wrap"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-title">
+              <h2>联网状态</h2>
+              <span>回答量、平均字数、信源引用</span>
+            </div>
+            <div id="search-bars" class="bar-list"></div>
+          </section>
+        </div>
+        <section class="panel">
+          <div class="panel-title">
+            <h2>问题场景</h2>
+            <span>养胃舒专项数据可按场景拆分</span>
+          </div>
+          <div id="scenario-table" class="table-wrap compact"></div>
+        </section>
+      </section>
+
+      <section id="coverage" class="view">
+        <section class="panel">
+          <div class="panel-title">
+            <h2>产品覆盖</h2>
+            <span>按数据集和产品汇总问题、回答、模型、联网状态</span>
+          </div>
+          <div id="product-table" class="table-wrap"></div>
+        </section>
+      </section>
+
+      <section id="models" class="view">
+        <div class="layout two">
+          <section class="panel">
+            <div class="panel-title">
+              <h2>模型回答量</h2>
+              <span>按数据集与模型拆分</span>
+            </div>
+            <div id="model-bars" class="bar-list"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-title">
+              <h2>模型明细</h2>
+              <span>问题覆盖、联网回答、平均字数</span>
+            </div>
+            <div id="model-table" class="table-wrap"></div>
+          </section>
+        </div>
+        <section class="panel">
+          <div class="panel-title">
+            <h2>问题层级</h2>
+            <span>标准 level 与原始层级映射</span>
+          </div>
+          <div id="level-table" class="table-wrap compact"></div>
+        </section>
+      </section>
+
+      <section id="splits" class="view">
+        <div class="layout two">
+          <section class="panel">
+            <div class="panel-title">
+              <h2>提及率/推荐率汇总</h2>
+              <span>品牌、通用名、竞品和品类拆分</span>
+            </div>
+            <div id="mention-split-table" class="table-wrap large"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-title">
+              <h2>推荐产品排行</h2>
+              <span>按推荐产品和名称类型</span>
+            </div>
+            <div id="rec-overview-table" class="table-wrap large"></div>
+          </section>
+        </div>
+        <div class="layout two">
+          <section class="panel">
+            <div class="panel-title">
+              <h2>名称类型汇总</h2>
+              <span>999品牌 / 通用名 / 竞品品牌</span>
+            </div>
+            <div id="type-summary-table" class="table-wrap"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-title">
+              <h2>推荐品类汇总</h2>
+              <span>不同问题下被推荐的品类结构</span>
+            </div>
+            <div id="category-summary-table" class="table-wrap"></div>
+          </section>
+        </div>
+        <section class="panel">
+          <div class="panel-title">
+            <h2>养胃舒目标品牌表现</h2>
+            <span>来自专项 Excel：能见度、前三率、首位率、位次</span>
+          </div>
+          <div id="yang-brand-table" class="table-wrap large"></div>
+        </section>
+        <section class="panel">
+          <div class="panel-title">
+            <h2>问题级推荐明细</h2>
+            <span>具体到问题、模型、轮次、推荐产品和推荐原因</span>
+          </div>
+          <div id="question-detail-table" class="table-wrap large"></div>
+        </section>
+      </section>
+
+      <section id="sources" class="view">
+        <div class="layout two">
+          <section class="panel">
+            <div class="panel-title">
+              <h2>引用域名排行</h2>
+              <span>来自标准 sources 表</span>
+            </div>
+            <div id="source-bars" class="bar-list"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-title">
+              <h2>域名明细</h2>
+              <span>按引用次数排序</span>
+            </div>
+            <div id="source-table" class="table-wrap"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="assets" class="view">
+        <section class="panel">
+          <div class="panel-title">
+            <h2>外部数据资产</h2>
+            <span>Excel 和 CSV 工作表已行级入库，可追溯原始文件</span>
+          </div>
+          <div id="asset-table" class="table-wrap large"></div>
+        </section>
+      </section>
+
+      <section id="samples" class="view">
+        <section class="panel">
+          <div class="panel-title">
+            <h2>回答样本</h2>
+            <span>用于快速核验数据是否正确入库</span>
+          </div>
+          <div id="answer-table" class="table-wrap large"></div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

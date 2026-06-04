@@ -12,3 +12,4 @@ __pycache__/
 *.xls
 *.xlsx
 results/extractions/
+data/geo_datasets/*.sqlite
