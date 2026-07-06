@@ -41,6 +41,17 @@ select {
   background: var(--nav);
   color: #ffffff;
   padding: 20px 16px;
+  /* 长页面滚动时保持侧边栏始终占满视口，避免黑条中断 */
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar .nav-tabs {
+  flex: 1;
 }
 
 .brand {
@@ -355,6 +366,8 @@ td:last-child {
     align-items: center;
     gap: 16px;
     padding: 12px 16px;
+    height: auto;
+    overflow-y: visible;
   }
 
   .brand {

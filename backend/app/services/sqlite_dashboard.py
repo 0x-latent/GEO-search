@@ -86,6 +86,8 @@ def delete_dataset(dataset_id: str) -> None:
 
 
 def list_sqlite_datasets(allowed: list[str] | None = None) -> list[dict[str, Any]]:
+    # 每张表先各自按 dataset_id 聚合再 JOIN，避免多表 LEFT JOIN 笛卡尔积
+    # （旧写法 questions×answers×sources 行数爆炸，低配服务器上单次查询 20s+）
     where, params = _dataset_filter("all", "d.dataset_id", allowed)
     with _connect() as conn:
         return _rows(
@@ -93,24 +95,33 @@ def list_sqlite_datasets(allowed: list[str] | None = None) -> list[dict[str, Any
                 f"""
                 SELECT d.dataset_id, d.name, d.description, d.source_type, d.source_path,
                        d.owner_username,
-                       COUNT(DISTINCT q.question_id) AS questions,
-                       COUNT(DISTINCT a.answer_id) AS answers,
-                       COUNT(DISTINCT q.product_code) AS products,
-                       COUNT(DISTINCT a.model) AS models,
-                       COUNT(DISTINCT s.url) AS source_urls,
+                       COALESCE(q.questions, 0) AS questions,
+                       COALESCE(a.answers, 0) AS answers,
+                       COALESCE(q.products, 0) AS products,
+                       COALESCE(a.models, 0) AS models,
+                       COALESCE(s.source_urls, 0) AS source_urls,
                        COALESCE(ext.tables, 0) AS external_tables,
                        COALESCE(ext.rows, 0) AS external_rows
                 FROM datasets d
-                LEFT JOIN questions q ON q.dataset_id = d.dataset_id
-                LEFT JOIN answers a ON a.dataset_id = d.dataset_id
-                LEFT JOIN sources s ON s.dataset_id = a.dataset_id AND s.answer_id = a.answer_id
+                LEFT JOIN (
+                    SELECT dataset_id, COUNT(DISTINCT question_id) AS questions,
+                           COUNT(DISTINCT product_code) AS products
+                    FROM questions GROUP BY dataset_id
+                ) q ON q.dataset_id = d.dataset_id
+                LEFT JOIN (
+                    SELECT dataset_id, COUNT(*) AS answers, COUNT(DISTINCT model) AS models
+                    FROM answers GROUP BY dataset_id
+                ) a ON a.dataset_id = d.dataset_id
+                LEFT JOIN (
+                    SELECT dataset_id, COUNT(DISTINCT url) AS source_urls
+                    FROM sources GROUP BY dataset_id
+                ) s ON s.dataset_id = d.dataset_id
                 LEFT JOIN (
                     SELECT dataset_id, COUNT(*) AS tables, SUM(row_count) AS rows
                     FROM external_tables
                     GROUP BY dataset_id
                 ) ext ON ext.dataset_id = d.dataset_id
                 {where}
-                GROUP BY d.dataset_id
                 ORDER BY d.dataset_id
                 """,
                 params,
