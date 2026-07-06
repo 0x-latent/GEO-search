@@ -415,3 +415,82 @@ td:last-child {
     gap: 6px;
   }
 }
+
+.sidebar-user {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--nav-hover);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sidebar-user strong {
+  display: block;
+  font-size: 14px;
+  word-break: break-all;
+}
+
+.sidebar-user small {
+  color: #9aa7b2;
+  font-size: 12px;
+}
+
+button.ghost {
+  min-height: 30px;
+  padding: 4px 10px;
+  border-color: var(--nav-hover);
+  background: transparent;
+  color: #cbd5e1;
+  font-size: 12px;
+}
+
+button.ghost:hover {
+  background: var(--nav-hover);
+  color: #ffffff;
+}
+
+.form-grid {
+  display: grid;
+  gap: 12px;
+  max-width: 360px;
+}
+
+.form-grid label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.form-grid input,
+.form-grid select {
+  min-width: 0;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 8px 11px;
+  font: inherit;
+}
+
+.user-actions {
+  white-space: nowrap;
+}
+
+.user-actions button {
+  min-height: 30px;
+  padding: 4px 10px;
+  font-size: 12px;
+  margin-right: 6px;
+}
+
+.user-actions button.danger {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.user-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}

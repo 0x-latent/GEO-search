@@ -5,10 +5,11 @@ services:
       dockerfile: Dockerfile
     image: geo-search-workbench:latest
     ports:
-      - "8000:8000"
+      - "${GEO_PORT:-8000}:8000"
     environment:
       LANG: C.UTF-8
       LC_ALL: C.UTF-8
+      GEO_ADMIN_PASSWORD: ${GEO_ADMIN_PASSWORD:-admin123}
     volumes:
       - ./config/api_keys.yaml:/app/config/api_keys.yaml:ro
       - ./config/brands.yaml:/app/config/brands.yaml
@@ -17,5 +18,6 @@ services:
       - ./docs/products_db:/app/docs/products_db
       - ./results:/app/results
       - ./backend/data:/app/backend/data
+      - ./data/geo_datasets:/app/data/geo_datasets
     restart: unless-stopped
 

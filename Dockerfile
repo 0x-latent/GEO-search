@@ -12,7 +12,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir --upgrade pip \
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/ \
+    && pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r /app/requirements.txt
 
 COPY backend /app/backend

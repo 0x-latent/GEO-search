@@ -23,7 +23,15 @@
         <button class="nav" data-tab="sources">信源</button>
         <button class="nav" data-tab="assets">数据资产</button>
         <button class="nav" data-tab="samples">回答样本</button>
+        <button class="nav" data-tab="users" id="nav-users" hidden>用户管理</button>
       </nav>
+      <div class="sidebar-user">
+        <div>
+          <strong id="current-username">-</strong>
+          <small id="current-role"></small>
+        </div>
+        <button id="logout" class="ghost" type="button">退出</button>
+      </div>
     </aside>
 
     <main>
@@ -193,6 +201,55 @@
             <span>用于快速核验数据是否正确入库</span>
           </div>
           <div id="answer-table" class="table-wrap large"></div>
+        </section>
+      </section>
+
+      <section id="users" class="view">
+        <div class="layout two">
+          <section class="panel">
+            <div class="panel-title">
+              <h2>新建用户</h2>
+              <span>管理员可创建普通用户或管理员</span>
+            </div>
+            <form id="create-user-form" class="form-grid">
+              <label>
+                用户名
+                <input id="new-username" required autocomplete="off" />
+              </label>
+              <label>
+                密码（至少 6 位）
+                <input id="new-password" type="password" required minlength="6" autocomplete="new-password" />
+              </label>
+              <label>
+                角色
+                <select id="new-role">
+                  <option value="user">普通用户</option>
+                  <option value="admin">管理员</option>
+                </select>
+              </label>
+              <button type="submit" class="primary">创建用户</button>
+            </form>
+          </section>
+          <section class="panel">
+            <div class="panel-title">
+              <h2>修改我的密码</h2>
+              <span>修改后需要重新登录</span>
+            </div>
+            <form id="change-password-form" class="form-grid">
+              <label>
+                新密码（至少 6 位）
+                <input id="own-password" type="password" required minlength="6" autocomplete="new-password" />
+              </label>
+              <button type="submit" class="primary">修改密码</button>
+            </form>
+          </section>
+        </div>
+        <section class="panel">
+          <div class="panel-title">
+            <h2>用户列表</h2>
+            <span>重置密码、调整角色或删除账号</span>
+          </div>
+          <div id="user-table" class="table-wrap"></div>
         </section>
       </section>
     </main>

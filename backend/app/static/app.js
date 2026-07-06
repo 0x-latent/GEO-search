@@ -4,6 +4,7 @@ const state = {
   splits: null,
   answers: [],
   activeTab: "overview",
+  user: null,
 };
 
 const titles = {
@@ -14,16 +15,34 @@ const titles = {
   sources: ["信源", "定位不同数据集里被 AI 引用最多的域名。"],
   assets: ["数据资产", "查看已入库的 Excel/CSV 工作表，摆脱运行时 Excel 依赖。"],
   samples: ["回答样本", "快速抽查标准回答表中的问题、模型、回答和信源数量。"],
+  users: ["用户管理", "创建、删除用户，重置密码和调整角色。"],
 };
 
-const api = async (path) => {
-  const res = await fetch(path);
+const api = async (path, options) => {
+  const res = await fetch(path, options);
+  if (res.status === 401) {
+    window.location.replace("/login.html");
+    throw new Error("未登录");
+  }
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || res.statusText);
+    let message = res.statusText;
+    try {
+      const data = await res.json();
+      message = data.detail || JSON.stringify(data);
+    } catch (err) {
+      // 保留 statusText
+    }
+    throw new Error(message);
   }
   return res.json();
 };
+
+const apiJson = (path, method, body) =>
+  api(path, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll(".nav").forEach((button) => {
@@ -34,10 +53,24 @@ document.addEventListener("DOMContentLoaded", () => {
     await loadDashboard();
   });
   document.getElementById("refresh").addEventListener("click", loadDashboard);
+  document.getElementById("logout").addEventListener("click", logout);
+  document.getElementById("create-user-form").addEventListener("submit", createUser);
+  document.getElementById("change-password-form").addEventListener("submit", changeOwnPassword);
   boot();
 });
 
 async function boot() {
+  try {
+    state.user = await api("/api/auth/me");
+    document.getElementById("current-username").textContent = state.user.username;
+    document.getElementById("current-role").textContent =
+      state.user.role === "admin" ? "管理员" : "普通用户";
+    if (state.user.role === "admin") {
+      document.getElementById("nav-users").hidden = false;
+    }
+  } catch (error) {
+    return;
+  }
   try {
     const datasets = await api("/api/sqlite/datasets");
     const select = document.getElementById("dataset-select");
@@ -80,6 +113,118 @@ function switchTab(tab) {
   });
   document.getElementById("view-title").textContent = titles[tab][0];
   document.getElementById("view-subtitle").textContent = titles[tab][1];
+  if (tab === "users") {
+    loadUsers();
+  }
+}
+
+async function logout() {
+  try {
+    await api("/api/auth/logout", { method: "POST" });
+  } catch (err) {
+    // 会话可能已过期，直接跳转
+  }
+  window.location.replace("/login.html");
+}
+
+async function loadUsers() {
+  try {
+    const users = await api("/api/auth/users");
+    renderUsers(users);
+  } catch (error) {
+    showStatus(`加载用户失败：${error.message}`, true);
+  }
+}
+
+function renderUsers(users) {
+  const target = document.getElementById("user-table");
+  if (!users || users.length === 0) {
+    target.innerHTML = `<p class="empty">暂无用户</p>`;
+    return;
+  }
+  target.innerHTML = `
+    <table>
+      <thead>
+        <tr><th>用户名</th><th>角色</th><th>创建时间</th><th>操作</th></tr>
+      </thead>
+      <tbody>
+        ${users
+          .map((user) => {
+            const name = escapeHtml(user.username);
+            const isSelf = user.username === state.user.username;
+            const nextRole = user.role === "admin" ? "user" : "admin";
+            const roleLabel = user.role === "admin" ? "管理员" : "普通用户";
+            const created = new Date(user.created_at * 1000).toLocaleString("zh-CN");
+            return `
+              <tr>
+                <td>${name}${isSelf ? "（我）" : ""}</td>
+                <td>${roleLabel}</td>
+                <td>${created}</td>
+                <td class="user-actions">
+                  <button data-action="reset" data-username="${name}">重置密码</button>
+                  <button data-action="role" data-username="${name}" data-role="${nextRole}" ${isSelf ? "disabled" : ""}>
+                    设为${nextRole === "admin" ? "管理员" : "普通用户"}
+                  </button>
+                  <button data-action="delete" data-username="${name}" class="danger" ${isSelf ? "disabled" : ""}>删除</button>
+                </td>
+              </tr>
+            `;
+          })
+          .join("")}
+      </tbody>
+    </table>
+  `;
+  target.querySelectorAll("button[data-action]").forEach((button) => {
+    button.addEventListener("click", () => handleUserAction(button.dataset));
+  });
+}
+
+async function handleUserAction({ action, username, role }) {
+  try {
+    if (action === "delete") {
+      if (!window.confirm(`确认删除用户 ${username}？`)) return;
+      await api(`/api/auth/users/${encodeURIComponent(username)}`, { method: "DELETE" });
+      showStatus(`已删除用户 ${username}`, false);
+    } else if (action === "reset") {
+      const password = window.prompt(`为 ${username} 设置新密码（至少 6 位）：`);
+      if (!password) return;
+      await apiJson(`/api/auth/users/${encodeURIComponent(username)}/password`, "PUT", { password });
+      showStatus(`已重置 ${username} 的密码`, false);
+    } else if (action === "role") {
+      await apiJson(`/api/auth/users/${encodeURIComponent(username)}/role`, "PUT", { role });
+      showStatus(`已调整 ${username} 的角色`, false);
+    }
+    await loadUsers();
+  } catch (error) {
+    showStatus(`操作失败：${error.message}`, true);
+  }
+}
+
+async function createUser(event) {
+  event.preventDefault();
+  const username = document.getElementById("new-username").value.trim();
+  const password = document.getElementById("new-password").value;
+  const role = document.getElementById("new-role").value;
+  try {
+    await apiJson("/api/auth/users", "POST", { username, password, role });
+    event.target.reset();
+    showStatus(`已创建用户 ${username}`, false);
+    await loadUsers();
+  } catch (error) {
+    showStatus(`创建失败：${error.message}`, true);
+  }
+}
+
+async function changeOwnPassword(event) {
+  event.preventDefault();
+  const password = document.getElementById("own-password").value;
+  try {
+    await apiJson("/api/auth/me/password", "PUT", { password });
+    window.alert("密码已修改，请重新登录");
+    window.location.replace("/login.html");
+  } catch (error) {
+    showStatus(`修改失败：${error.message}`, true);
+  }
 }
 
 function renderAll() {

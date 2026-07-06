@@ -12,6 +12,7 @@ __pycache__/
 config/api_keys.yaml
 results/
 backend/data/
+data/
 *.7z
 *.xls
 *.xlsx
