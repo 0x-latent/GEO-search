@@ -23,6 +23,9 @@
         <button class="nav" data-tab="sources">信源</button>
         <button class="nav" data-tab="assets">数据资产</button>
         <button class="nav" data-tab="samples">回答样本</button>
+        <button class="nav" data-tab="analysis">我的分析</button>
+        <button class="nav" data-tab="myconfig">我的配置</button>
+        <button class="nav" data-tab="datasets" id="nav-datasets" hidden>数据集管理</button>
         <button class="nav" data-tab="users" id="nav-users" hidden>用户管理</button>
       </nav>
       <div class="sidebar-user">
@@ -201,6 +204,139 @@
             <span>用于快速核验数据是否正确入库</span>
           </div>
           <div id="answer-table" class="table-wrap large"></div>
+        </section>
+      </section>
+
+      <section id="analysis" class="view">
+        <section class="panel">
+          <div class="panel-title">
+            <h2>① 上传问题</h2>
+            <span>
+              支持 Excel / CSV / JSON，单次上限 500 题。模板：
+              <a href="/api/templates/questions.xlsx">Excel</a> ·
+              <a href="/api/templates/questions.csv">CSV</a> ·
+              <a href="/api/templates/questions.json">JSON</a>
+            </span>
+          </div>
+          <div class="form-row">
+            <label>
+              问题文件
+              <input type="file" id="job-file" accept=".xlsx,.csv,.json" />
+            </label>
+            <label>
+              默认产品名（文件里未填产品列时使用）
+              <input id="job-default-product" placeholder="如：感冒灵" />
+            </label>
+            <button id="job-parse" class="primary" type="button">解析预览</button>
+          </div>
+          <div id="job-preview" class="table-wrap compact"></div>
+        </section>
+        <section class="panel" id="job-config-panel" hidden>
+          <div class="panel-title">
+            <h2>② 配置分析任务</h2>
+            <span>建议使用各厂商的默认推荐型号；调用成本由模型和题数决定</span>
+          </div>
+          <div class="form-row">
+            <label>
+              数据集名称
+              <input id="job-dataset-name" placeholder="如：感冒灵摸底0706" />
+            </label>
+            <label>
+              联网模式
+              <select id="job-search-mode">
+                <option value="both">联网 + 非联网</option>
+                <option value="search">仅联网</option>
+                <option value="nosearch">仅非联网</option>
+              </select>
+            </label>
+            <label>
+              每题轮次
+              <select id="job-rounds">
+                <option value="1">1 轮</option>
+                <option value="2">2 轮</option>
+                <option value="3">3 轮</option>
+                <option value="5">5 轮</option>
+              </select>
+            </label>
+            <label id="job-route-wrap" hidden>
+              调用链路（仅管理员）
+              <select id="job-route">
+                <option value="relay">new-api 中继（默认）</option>
+                <option value="direct">厂商直连</option>
+              </select>
+            </label>
+          </div>
+          <div id="job-models" class="model-picker"></div>
+          <p class="hint">💡 各厂商已选中默认推荐型号，如无特殊需要请保持默认。</p>
+          <button id="job-submit" class="primary" type="button">提交分析任务</button>
+        </section>
+        <section class="panel">
+          <div class="panel-title">
+            <h2>任务列表</h2>
+            <span>采集 → 报表 → 抽取 → 入库，完成后可在总览里选择该数据集</span>
+            <button id="job-refresh" class="ghost-dark" type="button">刷新</button>
+          </div>
+          <div id="job-table" class="table-wrap"></div>
+          <pre id="job-log" class="log-view" hidden></pre>
+        </section>
+      </section>
+
+      <section id="myconfig" class="view">
+        <div class="layout two">
+          <section class="panel">
+            <div class="panel-title">
+              <h2>我的品牌配置（brands）</h2>
+              <span id="my-brands-source"></span>
+            </div>
+            <textarea id="my-brands-editor" class="config-editor" spellcheck="false"></textarea>
+            <div class="form-row">
+              <button class="primary" id="my-brands-save" type="button">保存</button>
+              <button id="my-brands-reset" type="button">恢复默认</button>
+            </div>
+          </section>
+          <section class="panel">
+            <div class="panel-title">
+              <h2>我的知识库（knowledge_base）</h2>
+              <span id="my-kb-source"></span>
+            </div>
+            <textarea id="my-kb-editor" class="config-editor" spellcheck="false"></textarea>
+            <div class="form-row">
+              <button class="primary" id="my-kb-save" type="button">保存</button>
+              <button id="my-kb-reset" type="button">恢复默认</button>
+            </div>
+          </section>
+        </div>
+        <div class="layout two" id="global-config-panels" hidden>
+          <section class="panel">
+            <div class="panel-title">
+              <h2>全局品牌配置（仅管理员）</h2>
+              <span>所有未自定义配置的用户使用此默认</span>
+            </div>
+            <textarea id="global-brands-editor" class="config-editor" spellcheck="false"></textarea>
+            <div class="form-row">
+              <button class="primary" id="global-brands-save" type="button">保存全局</button>
+            </div>
+          </section>
+          <section class="panel">
+            <div class="panel-title">
+              <h2>全局知识库（仅管理员）</h2>
+              <span>06/07 校验体系的默认知识库</span>
+            </div>
+            <textarea id="global-kb-editor" class="config-editor" spellcheck="false"></textarea>
+            <div class="form-row">
+              <button class="primary" id="global-kb-save" type="button">保存全局</button>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section id="datasets" class="view">
+        <section class="panel">
+          <div class="panel-title">
+            <h2>数据集管理</h2>
+            <span>删除会级联清除该数据集的全部问题、回答、信源和外部表</span>
+          </div>
+          <div id="dataset-admin-table" class="table-wrap"></div>
         </section>
       </section>
 

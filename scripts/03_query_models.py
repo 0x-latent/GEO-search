@@ -12,15 +12,22 @@ import yaml
 from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.api_clients import ModelClient
+from utils.api_clients import ModelClient, resolve_relay, resolve_route
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RESULTS_DIR = os.path.join(BASE_DIR, "results")
-RAW_DIR = os.path.join(RESULTS_DIR, "raw")
-LOG_PATH = os.path.join(RESULTS_DIR, "execution_log.json")
+# 环境变量覆盖用于用户自助分析任务（独立工作目录），缺省行为与原版完全一致
+RAW_DIR = os.environ.get("GEO_RAW_DIR") or os.path.join(RESULTS_DIR, "raw")
+LOG_PATH = os.environ.get("GEO_EXEC_LOG") or os.path.join(RESULTS_DIR, "execution_log.json")
+QUESTIONS_FILE_ENV = os.environ.get("GEO_QUESTIONS_FILE", "")
+ROUTE_ENV = os.environ.get("GEO_ROUTE", "")            # relay / direct，空则按 models.yaml relay.enabled
+ROUNDS_ENV = os.environ.get("GEO_ROUNDS", "")          # 覆盖 query_settings.rounds
+MODELS_ENV = os.environ.get("GEO_MODELS", "")          # 逗号分隔，只跑这些模型
+MODEL_OVERRIDES_ENV = os.environ.get("GEO_MODEL_OVERRIDES", "")  # JSON: {"qwen": "qwen3.7-max"}
+SEARCH_MODES_ENV = os.environ.get("GEO_SEARCH_MODES", "")  # both / search / nosearch
 
 
 class AdaptiveThrottle:
@@ -276,9 +283,14 @@ async def query_single_model(
     interval = client.config.get("request_interval", 0.2)
     throttle = AdaptiveThrottle(model_key, concurrency, interval)
 
-    search_modes = [False]
-    if client.supports_search:
-        search_modes.append(True)
+    if SEARCH_MODES_ENV == "search":
+        search_modes = [True] if client.supports_search else []
+    elif SEARCH_MODES_ENV == "nosearch":
+        search_modes = [False]
+    else:
+        search_modes = [False]
+        if client.supports_search:
+            search_modes.append(True)
 
     total = len(questions) * rounds * len(search_modes)
     counter = {"done": 0, "total": total}
@@ -366,9 +378,23 @@ async def main(rerun_ids: list = None, rerun_models: list = None):
 
     query_settings = config.get("query_settings", {})
     rounds = query_settings.get("rounds", 5)
+    if ROUNDS_ENV:
+        rounds = max(1, int(ROUNDS_ENV))
+
+    # 链路决策：GEO_ROUTE 显式指定优先，否则按 relay.enabled；relay 缺配置自动回退直连
+    route = resolve_route(config, keys, ROUTE_ENV or None)
+    relay_conf = resolve_relay(config, keys) if route == "relay" else None
+    model_overrides = {}
+    if MODEL_OVERRIDES_ENV:
+        try:
+            model_overrides = json.loads(MODEL_OVERRIDES_ENV)
+        except json.JSONDecodeError:
+            logger.warning(f"GEO_MODEL_OVERRIDES 不是合法JSON，忽略: {MODEL_OVERRIDES_ENV}")
+    only_models = {m.strip() for m in MODELS_ENV.split(",") if m.strip()} if MODELS_ENV else None
+    logger.info(f"链路: {route}" + (f" via {relay_conf['base_url']}" if relay_conf else ""))
 
     # 加载问题
-    questions_path = os.path.join(BASE_DIR, "questions", "questions_expanded.json")
+    questions_path = QUESTIONS_FILE_ENV or os.path.join(BASE_DIR, "questions", "questions_expanded.json")
     if not os.path.exists(questions_path):
         questions_path = os.path.join(BASE_DIR, "questions", "questions_base.json")
 
@@ -420,12 +446,23 @@ async def main(rerun_ids: list = None, rerun_models: list = None):
             logger.info(f"[{model_key}] 不在重跑模型列表中，跳过")
             continue
 
+        # GEO_MODELS 指定模型子集（用户自助分析时按勾选过滤）
+        if only_models is not None and model_key not in only_models:
+            logger.info(f"[{model_key}] 不在指定模型列表中，跳过")
+            continue
+
         api_key = keys.get(model_key, {}).get("api_key", "")
-        if not api_key or api_key == "sk-xxx":
+        if route != "relay" and (not api_key or api_key == "sk-xxx"):
             logger.warning(f"[{model_key}] API key未配置，跳过")
             continue
 
-        client = ModelClient(model_key, model_config, api_key)
+        override = model_overrides.get(model_key)
+        if override:
+            logger.info(f"[{model_key}] 使用指定型号: {override}")
+        client = ModelClient(
+            model_key, model_config, api_key,
+            route=route, relay_config=relay_conf, model_override=override,
+        )
         concurrency = model_config.get("concurrency", 1)
         task = query_single_model(
             model_key, client, questions, rounds,

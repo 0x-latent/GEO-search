@@ -1,45 +1,78 @@
+# 中继网关（new-api）：enabled 时默认所有模型经中继调用，成本监控与模型放行在 new-api 后台
+# 令牌配置在 api_keys.yaml 的 relay.api_key；缺失时自动回退直连
+relay:
+  enabled: true
+  base_url: "http://104.238.150.252:3000/v1"
+
 models:
   qwen:
     name: "通义千问"
     enabled: true
-    model_id: "qwen3.6-plus"                          # 统一用Responses API
-    search_model_id: "qwen3.6-plus"               # 联网和非联网都走Responses API
+    model_id: "qwen3.7-plus"                       # 默认推荐（均衡）
+    search_model_id: "qwen3.7-plus"                # 联网和非联网都走Responses API
     endpoint: "https://dashscope.aliyuncs.com/compatible-mode/v1"
     supports_search: true
     search_api: "responses"                        # 联网走Responses API
     concurrency: 5
     request_interval: 0.2
+    variants:                                      # 界面可选型号，第一个为默认推荐
+      - id: "qwen3.7-plus"
+        label: "Qwen3.7-Plus（推荐）"
+      - id: "qwen3.7-max"
+        label: "Qwen3.7-Max（旗舰，更贵）"
+      - id: "qwen3.6-plus"
+        label: "Qwen3.6-Plus（上一代）"
+      - id: "qwen3.6-flash"
+        label: "Qwen3.6-Flash（轻量）"
 
   deepseek:
     name: "DeepSeek"
     enabled: true
-    model_id: "deepseek-chat"
+    model_id: "deepseek-v4-flash"                  # deepseek-chat 2026-07-24 退役，升级 V4
     endpoint: "https://api.deepseek.com/v1"
     supports_search: false                         # 标准API不支持联网
     search_api: "chat_completions"
     concurrency: 5
     request_interval: 0.2
+    variants:
+      - id: "deepseek-v4-flash"
+        label: "DeepSeek-V4-Flash（推荐）"
+      - id: "deepseek-v4-pro"
+        label: "DeepSeek-V4-Pro（旗舰，更贵）"
 
   hunyuan:
     name: "腾讯混元"
     enabled: true
-    api_type: "tencent_cloud"                      # 腾讯云原生API（SecretId+SecretKey签名）
+    api_type: "tencent_cloud"                      # 直连时用腾讯云原生API（SecretId+SecretKey签名）
     model_id: "hunyuan-2.0-instruct-20251111"
     region: "ap-guangzhou"
-    supports_search: true                          # 通过EnableEnhancement开启联网搜索
+    supports_search: true                          # 直连通过EnableEnhancement开启联网搜索
+    search_param: "enable_enhancement"             # 经中继(chat_completions)时联网增强的透传参数
     concurrency: 5
     request_interval: 0.2
+    variants:
+      - id: "hunyuan-2.0-instruct-20251111"
+        label: "混元2.0-Instruct（推荐）"
+      - id: "hunyuan-2.0-thinking"
+        label: "混元2.0-Thinking（推理）"
+      - id: "hunyuan-t1"
+        label: "混元T1"
 
   doubao:
     name: "豆包"
     enabled: true
-    model_id: "doubao-seed-2-0-pro-260215"         # 非联网对话
-    search_model_id: "doubao-seed-2-0-pro-260215"  # 联网搜索（同模型，走Responses API）
+    model_id: "doubao-seed-2-1-pro-260628"         # 默认推荐（2.1 Pro 旗舰）
+    search_model_id: "doubao-seed-2-1-pro-260628"  # 联网搜索（同模型，走Responses API）
     endpoint: "https://ark.cn-beijing.volces.com/api/v3"
     supports_search: true
     search_api: "responses"                        # 联网走Responses API
     concurrency: 10
     request_interval: 0.1
+    variants:
+      - id: "doubao-seed-2-1-pro-260628"
+        label: "豆包Seed-2.1-Pro（推荐）"
+      - id: "doubao-seed-2-0-pro-260215"
+        label: "豆包Seed-2.0-Pro（上一代）"
 
 query_settings:
   rounds: 5
@@ -47,3 +80,8 @@ query_settings:
   max_tokens: 2048
   retry_max: 3
   retry_delay: 5
+
+# 用户自助分析任务的默认参数（区别于 admin 全量采集的 query_settings）
+job_settings:
+  rounds: 1
+  max_questions: 500

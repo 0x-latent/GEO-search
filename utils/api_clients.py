@@ -14,24 +14,68 @@ from openai import AsyncOpenAI
 logger = logging.getLogger(__name__)
 
 
+def resolve_relay(models_config: dict, keys: dict) -> dict | None:
+    """从 models.yaml 的 relay 段和 api_keys.yaml 的 relay key 组装中继配置。
+
+    返回 {"base_url", "api_key"}；base_url 或 key 缺失时返回 None（回退直连）。
+    """
+    relay = dict(models_config.get("relay") or {})
+    key = (keys.get("relay") or {}).get("api_key", "")
+    if relay.get("base_url") and key and key != "sk-xxx":
+        relay["api_key"] = key
+        return relay
+    return None
+
+
+def resolve_route(models_config: dict, keys: dict, requested: str | None = None) -> str:
+    """决定链路：requested 显式指定优先；否则 relay 可用且 enabled 时默认走 relay。"""
+    relay = resolve_relay(models_config, keys)
+    if requested == "direct":
+        return "direct"
+    if requested == "relay":
+        if relay is None:
+            logger.warning("请求走中继但 relay 未配置（缺 base_url 或 api_key），回退直连")
+            return "direct"
+        return "relay"
+    if relay is not None and (models_config.get("relay") or {}).get("enabled", False):
+        return "relay"
+    return "direct"
+
+
 class ModelClient:
     """统一模型客户端"""
 
-    def __init__(self, model_key: str, config: dict, api_key: str):
+    def __init__(self, model_key: str, config: dict, api_key: str,
+                 route: str = "direct", relay_config: dict | None = None,
+                 model_override: str | None = None):
         self.model_key = model_key
         self.config = config
         self.name = config["name"]
-        self.model_id = config["model_id"]
-        self.search_model_id = config.get("search_model_id", self.model_id)
+        self.model_id = model_override or config["model_id"]
+        self.search_model_id = model_override or config.get("search_model_id", config["model_id"])
         self.supports_search = config.get("supports_search", False)
         self.search_api = config.get("search_api", "chat_completions")
         self.request_interval = config.get("request_interval", 1.0)
         self.api_key = api_key
         self.endpoint = config.get("endpoint", "")
+        self.route = "direct"
 
-        # 混元用腾讯云SDK，其他用OpenAI兼容接口
-        if config.get("api_type") == "tencent_cloud":
-            self.client = None  # 混元不用OpenAI client
+        if route == "relay" and relay_config and relay_config.get("base_url") and relay_config.get("api_key"):
+            # 统一走 new-api 中继（OpenAI 兼容），混元也不再需要腾讯 SDK
+            self.route = "relay"
+            self.endpoint = relay_config["base_url"]
+            self.api_key = relay_config["api_key"]
+            self._hunyuan_client = None
+            if config.get("api_type") == "tencent_cloud":
+                # 混元经中继降级为 chat_completions；联网增强参数由渠道透传
+                self.search_api = "chat_completions"
+            self.client = AsyncOpenAI(
+                api_key=self.api_key,
+                base_url=self.endpoint,
+            )
+        elif config.get("api_type") == "tencent_cloud":
+            # 混元直连：腾讯云原生SDK（保留作为中继故障时的回退链路）
+            self.client = None
             self._hunyuan_client = self._init_hunyuan_client(api_key, config)
         else:
             self._hunyuan_client = None

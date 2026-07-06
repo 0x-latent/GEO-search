@@ -12,3 +12,7 @@ hunyuan:
 
 doubao:
   api_key: "sk-xxx"
+
+# new-api 中继网关令牌（models.yaml relay.enabled 时默认走中继）
+relay:
+  api_key: "sk-xxx"

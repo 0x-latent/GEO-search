@@ -15,8 +15,8 @@ from utils.reporter import generate_all_reports
 from utils.similarity import clean_text, calc_similarity
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-RAW_DIR = os.path.join(BASE_DIR, "results", "raw")
-ANALYSIS_DIR = os.path.join(BASE_DIR, "results", "analysis")
+RAW_DIR = os.environ.get("GEO_RAW_DIR") or os.path.join(BASE_DIR, "results", "raw")
+ANALYSIS_DIR = os.environ.get("GEO_ANALYSIS_DIR") or os.path.join(BASE_DIR, "results", "analysis")
 
 
 def load_questions_map() -> dict:

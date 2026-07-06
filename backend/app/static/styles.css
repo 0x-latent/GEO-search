@@ -494,3 +494,135 @@ button.ghost:hover {
   opacity: 0.45;
   cursor: default;
 }
+
+.form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: flex-end;
+  margin-bottom: 14px;
+}
+
+.form-row label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  min-width: 180px;
+}
+
+.form-row input,
+.form-row select {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 8px 11px;
+  font: inherit;
+  min-width: 0;
+}
+
+.form-row input[type="file"] {
+  padding: 6px;
+}
+
+.model-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.model-option {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+  background: var(--surface-soft);
+}
+
+.model-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.model-option select {
+  min-height: 34px;
+  min-width: 0;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 9px;
+  font-size: 13px;
+}
+
+.tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #ccfbf1;
+  color: var(--teal);
+}
+
+.tag.muted {
+  background: #f1f5f9;
+  color: var(--muted);
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 4px 0 12px;
+}
+
+.config-editor {
+  width: 100%;
+  min-height: 320px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 10px;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+  margin-bottom: 10px;
+  box-sizing: border-box;
+}
+
+.log-view {
+  margin-top: 14px;
+  max-height: 420px;
+  overflow: auto;
+  background: #0f172a;
+  color: #cbd5e1;
+  border-radius: 8px;
+  padding: 14px;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+button.ghost-dark {
+  min-height: 30px;
+  padding: 4px 12px;
+  font-size: 12px;
+}
+
+button.danger {
+  border-color: var(--red);
+  color: var(--red);
+  background: #ffffff;
+}
+
+.panel-title {
+  position: relative;
+}
+
+.panel-title > button {
+  position: absolute;
+  right: 0;
+  top: 0;
+}

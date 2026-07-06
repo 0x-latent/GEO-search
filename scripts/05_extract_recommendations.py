@@ -19,12 +19,12 @@ import pandas as pd
 from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.api_clients import ModelClient
+from utils.api_clients import ModelClient, resolve_relay, resolve_route
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-RAW_DIR = os.path.join(BASE_DIR, "results", "raw")
-ANALYSIS_DIR = os.path.join(BASE_DIR, "results", "analysis")
-EXTRACT_DIR = os.path.join(BASE_DIR, "results", "extractions")
+RAW_DIR = os.environ.get("GEO_RAW_DIR") or os.path.join(BASE_DIR, "results", "raw")
+ANALYSIS_DIR = os.environ.get("GEO_ANALYSIS_DIR") or os.path.join(BASE_DIR, "results", "analysis")
+EXTRACT_DIR = os.environ.get("GEO_EXTRACT_DIR") or os.path.join(BASE_DIR, "results", "extractions")
 EXTRACT_LOG_PATH = os.path.join(EXTRACT_DIR, "extraction_log.json")
 
 CONCURRENCY = 10
@@ -159,13 +159,16 @@ async def main():
     with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
+    route = resolve_route(config, keys, os.environ.get("GEO_ROUTE") or None)
+    relay_conf = resolve_relay(config, keys) if route == "relay" else None
     ds_key = keys.get("deepseek", {}).get("api_key", "")
-    if not ds_key or ds_key == "sk-xxx":
-        print("错误: 需要DeepSeek API key")
+    if route != "relay" and (not ds_key or ds_key == "sk-xxx"):
+        print("错误: 需要DeepSeek API key（或配置 relay 中继）")
         sys.exit(1)
 
     ds_config = config["models"]["deepseek"]
-    client = ModelClient("deepseek", ds_config, ds_key)
+    client = ModelClient("deepseek", ds_config, ds_key, route=route, relay_config=relay_conf)
+    print(f"抽取链路: {route}")
 
     # 加载应答
     responses = load_recommendation_responses()
@@ -254,7 +257,7 @@ def _load_brand_matchers():
       - 999: brand_999 (名称+aliases)
       - 竞品: known_brand_competitors + generic_names
     """
-    config_path = os.path.join(BASE_DIR, "config", "brands.yaml")
+    config_path = os.environ.get("GEO_BRANDS_FILE") or os.path.join(BASE_DIR, "config", "brands.yaml")
     with open(config_path, "r", encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
 
@@ -915,7 +918,7 @@ def _generate_suggestions(issues: list) -> str:
 
 def _load_brand_config():
     """加载brands.yaml配置"""
-    path = os.path.join(BASE_DIR, "config", "brands.yaml")
+    path = os.environ.get("GEO_BRANDS_FILE") or os.path.join(BASE_DIR, "config", "brands.yaml")
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 

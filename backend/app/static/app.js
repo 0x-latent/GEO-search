@@ -15,6 +15,9 @@ const titles = {
   sources: ["信源", "定位不同数据集里被 AI 引用最多的域名。"],
   assets: ["数据资产", "查看已入库的 Excel/CSV 工作表，摆脱运行时 Excel 依赖。"],
   samples: ["回答样本", "快速抽查标准回答表中的问题、模型、回答和信源数量。"],
+  analysis: ["我的分析", "上传问题，选择模型，系统自动采集回答并生成分析数据集。"],
+  myconfig: ["我的配置", "维护自己的品牌配置和知识库，分析任务会优先使用你的配置。"],
+  datasets: ["数据集管理", "查看全部数据集的归属和规模，删除不再需要的数据集。"],
   users: ["用户管理", "创建、删除用户，重置密码和调整角色。"],
 };
 
@@ -56,6 +59,15 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("logout").addEventListener("click", logout);
   document.getElementById("create-user-form").addEventListener("submit", createUser);
   document.getElementById("change-password-form").addEventListener("submit", changeOwnPassword);
+  document.getElementById("job-parse").addEventListener("click", parseJobFile);
+  document.getElementById("job-submit").addEventListener("click", submitJob);
+  document.getElementById("job-refresh").addEventListener("click", loadJobs);
+  document.getElementById("my-brands-save").addEventListener("click", () => saveMyConfig("brands"));
+  document.getElementById("my-brands-reset").addEventListener("click", () => resetMyConfig("brands"));
+  document.getElementById("my-kb-save").addEventListener("click", () => saveMyConfig("kb"));
+  document.getElementById("my-kb-reset").addEventListener("click", () => resetMyConfig("kb"));
+  document.getElementById("global-brands-save").addEventListener("click", saveGlobalBrands);
+  document.getElementById("global-kb-save").addEventListener("click", saveGlobalKb);
   boot();
 });
 
@@ -67,6 +79,9 @@ async function boot() {
       state.user.role === "admin" ? "管理员" : "普通用户";
     if (state.user.role === "admin") {
       document.getElementById("nav-users").hidden = false;
+      document.getElementById("nav-datasets").hidden = false;
+      document.getElementById("global-config-panels").hidden = false;
+      document.getElementById("job-route-wrap").hidden = false;
     }
   } catch (error) {
     return;
@@ -115,6 +130,349 @@ function switchTab(tab) {
   document.getElementById("view-subtitle").textContent = titles[tab][1];
   if (tab === "users") {
     loadUsers();
+  } else if (tab === "analysis") {
+    loadJobOptions();
+    loadJobs();
+  } else if (tab === "myconfig") {
+    loadMyConfigs();
+  } else if (tab === "datasets") {
+    loadDatasetAdmin();
+  }
+}
+
+// ---------- 我的分析 ----------
+
+async function loadJobOptions() {
+  if (state.jobOptions) return;
+  try {
+    state.jobOptions = await api("/api/jobs/options");
+    renderModelPicker();
+  } catch (error) {
+    showStatus(`加载模型选项失败：${error.message}`, true);
+  }
+}
+
+function renderModelPicker() {
+  const target = document.getElementById("job-models");
+  target.innerHTML = state.jobOptions.models
+    .map(
+      (model) => `
+      <div class="model-option">
+        <label class="model-check">
+          <input type="checkbox" data-model-key="${escapeHtml(model.key)}" checked />
+          <strong>${escapeHtml(model.name)}</strong>
+          ${model.supports_search ? '<span class="tag">支持联网</span>' : '<span class="tag muted">不联网</span>'}
+        </label>
+        <select data-model-variant="${escapeHtml(model.key)}">
+          ${model.variants
+            .map(
+              (v, i) =>
+                `<option value="${escapeHtml(v.id)}" ${i === 0 ? "selected" : ""}>${escapeHtml(v.label)}</option>`,
+            )
+            .join("")}
+        </select>
+      </div>
+    `,
+    )
+    .join("");
+}
+
+async function parseJobFile() {
+  const fileInput = document.getElementById("job-file");
+  if (!fileInput.files.length) {
+    showStatus("请先选择问题文件", true);
+    return;
+  }
+  const form = new FormData();
+  form.append("file", fileInput.files[0]);
+  form.append("default_product", document.getElementById("job-default-product").value.trim());
+  try {
+    const result = await api("/api/jobs/parse", { method: "POST", body: form });
+    state.parsedQuestions = result.questions;
+    showStatus(`解析成功：共 ${result.total} 个问题`, false);
+    renderTable(
+      "job-preview",
+      result.preview.map((q) => ({ 编号: q.id, 产品: q.product, 层级: q.level, 问题: q.question })),
+      [
+        ["编号", "编号"],
+        ["产品", "产品"],
+        ["层级", "层级"],
+        ["问题", "问题"],
+      ],
+    );
+    document.getElementById("job-config-panel").hidden = false;
+  } catch (error) {
+    state.parsedQuestions = null;
+    document.getElementById("job-config-panel").hidden = true;
+    showStatus(`解析失败：${error.message}`, true);
+  }
+}
+
+async function submitJob() {
+  if (!state.parsedQuestions) {
+    showStatus("请先解析问题文件", true);
+    return;
+  }
+  const models = [];
+  const overrides = {};
+  document.querySelectorAll("#job-models input[data-model-key]").forEach((box) => {
+    if (!box.checked) return;
+    const key = box.dataset.modelKey;
+    models.push(key);
+    const select = document.querySelector(`select[data-model-variant="${key}"]`);
+    const option = state.jobOptions.models.find((m) => m.key === key);
+    if (select && option && select.value !== option.default_model) {
+      overrides[key] = select.value;
+    }
+  });
+  const payload = {
+    dataset_name: document.getElementById("job-dataset-name").value.trim(),
+    questions: state.parsedQuestions,
+    models,
+    model_overrides: overrides,
+    search_mode: document.getElementById("job-search-mode").value,
+    rounds: Number(document.getElementById("job-rounds").value),
+  };
+  if (state.user.role === "admin") {
+    payload.route = document.getElementById("job-route").value;
+  }
+  const estimated = estimateCalls(payload);
+  if (!window.confirm(`将发起约 ${estimated} 次模型调用，确认提交？`)) return;
+  try {
+    await api("/api/jobs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    showStatus("任务已提交，正在排队执行", false);
+    state.parsedQuestions = null;
+    document.getElementById("job-config-panel").hidden = true;
+    document.getElementById("job-preview").innerHTML = "";
+    document.getElementById("job-file").value = "";
+    await loadJobs();
+  } catch (error) {
+    showStatus(`提交失败：${error.message}`, true);
+  }
+}
+
+function estimateCalls(payload) {
+  let modes = payload.search_mode === "both" ? 2 : 1;
+  const searchable = payload.models.filter((key) => {
+    const m = state.jobOptions.models.find((item) => item.key === key);
+    return m && m.supports_search;
+  }).length;
+  const plain = payload.models.length - searchable;
+  const perQuestion =
+    payload.search_mode === "both" ? searchable * 2 + plain : payload.search_mode === "search" ? searchable : payload.models.length;
+  return payload.questions.length * perQuestion * payload.rounds;
+}
+
+const JOB_STATUS_LABELS = {
+  queued: "排队中",
+  running: "执行中",
+  success: "已完成",
+  failed: "失败",
+};
+const JOB_STAGE_LABELS = {
+  collect: "采集回答",
+  analyze: "统计报表",
+  extract: "推荐抽取",
+  import: "入库",
+  done: "完成",
+};
+
+async function loadJobs() {
+  try {
+    const jobs = await api("/api/jobs");
+    renderTable(
+      "job-table",
+      jobs.map((job) => ({
+        任务: job.job_id,
+        名称: job.dataset_name,
+        提交人: job.username,
+        状态: JOB_STATUS_LABELS[job.status] || job.status,
+        阶段: JOB_STAGE_LABELS[job.stage] || job.stage || "-",
+        题数: job.question_count,
+        模型: JSON.parse(job.models_json).join("、"),
+        创建时间: job.created_at,
+        错误: job.error || "",
+      })),
+      [
+        ["任务", "任务ID"],
+        ["名称", "数据集"],
+        ["提交人", "提交人"],
+        ["状态", "状态"],
+        ["阶段", "阶段"],
+        ["题数", "题数"],
+        ["模型", "模型"],
+        ["创建时间", "创建时间"],
+        ["错误", "错误"],
+      ],
+    );
+    // 表格行点击查看日志
+    document.querySelectorAll("#job-table tbody tr").forEach((tr, index) => {
+      tr.style.cursor = "pointer";
+      tr.addEventListener("click", () => showJobLog(jobs[index].job_id));
+    });
+  } catch (error) {
+    showStatus(`加载任务失败：${error.message}`, true);
+  }
+}
+
+async function showJobLog(jobId) {
+  try {
+    const result = await api(`/api/jobs/${encodeURIComponent(jobId)}/log`);
+    const view = document.getElementById("job-log");
+    view.hidden = false;
+    view.textContent = result.log || "（暂无日志）";
+    view.scrollTop = view.scrollHeight;
+  } catch (error) {
+    showStatus(`读取日志失败：${error.message}`, true);
+  }
+}
+
+// ---------- 我的配置 ----------
+
+async function loadMyConfigs() {
+  try {
+    const [brands, kb] = await Promise.all([
+      api("/api/config/my/brands"),
+      api("/api/config/my/knowledge-base"),
+    ]);
+    document.getElementById("my-brands-editor").value = JSON.stringify(brands.data, null, 2);
+    document.getElementById("my-brands-source").textContent =
+      brands.source === "user" ? "当前：自定义配置" : "当前：全局默认（保存后生成你的副本）";
+    document.getElementById("my-kb-editor").value = JSON.stringify(kb.data, null, 2);
+    document.getElementById("my-kb-source").textContent =
+      kb.source === "user" ? "当前：自定义配置" : "当前：全局默认（保存后生成你的副本）";
+    if (state.user.role === "admin") {
+      const [globalBrands, globalKb] = await Promise.all([
+        api("/api/config/brands"),
+        api("/api/config/knowledge-base"),
+      ]);
+      document.getElementById("global-brands-editor").value = JSON.stringify(globalBrands, null, 2);
+      document.getElementById("global-kb-editor").value = JSON.stringify(globalKb, null, 2);
+    }
+  } catch (error) {
+    showStatus(`加载配置失败：${error.message}`, true);
+  }
+}
+
+function readEditorJson(id) {
+  const text = document.getElementById(id).value;
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw new Error("JSON 格式错误：" + error.message);
+  }
+}
+
+async function saveMyConfig(kind) {
+  const editorId = kind === "brands" ? "my-brands-editor" : "my-kb-editor";
+  const path = kind === "brands" ? "/api/config/my/brands" : "/api/config/my/knowledge-base";
+  try {
+    const data = readEditorJson(editorId);
+    await api(path, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data }),
+    });
+    showStatus("已保存自定义配置", false);
+    await loadMyConfigs();
+  } catch (error) {
+    showStatus(`保存失败：${error.message}`, true);
+  }
+}
+
+async function resetMyConfig(kind) {
+  const path = kind === "brands" ? "/api/config/my/brands" : "/api/config/my/knowledge-base";
+  if (!window.confirm("确认删除自定义配置并恢复全局默认？")) return;
+  try {
+    await api(path, { method: "DELETE" });
+    showStatus("已恢复全局默认", false);
+    await loadMyConfigs();
+  } catch (error) {
+    showStatus(`操作失败：${error.message}`, true);
+  }
+}
+
+async function saveGlobalBrands() {
+  try {
+    const data = readEditorJson("global-brands-editor");
+    await api("/api/config/brands", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data }),
+    });
+    showStatus("全局品牌配置已保存（自动生成版本快照）", false);
+  } catch (error) {
+    showStatus(`保存失败：${error.message}`, true);
+  }
+}
+
+async function saveGlobalKb() {
+  try {
+    const data = readEditorJson("global-kb-editor");
+    await api("/api/config/knowledge-base", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data }),
+    });
+    showStatus("全局知识库已保存", false);
+  } catch (error) {
+    showStatus(`保存失败：${error.message}`, true);
+  }
+}
+
+// ---------- 数据集管理（admin） ----------
+
+async function loadDatasetAdmin() {
+  try {
+    const datasets = await api("/api/sqlite/datasets");
+    const target = document.getElementById("dataset-admin-table");
+    if (!datasets.length) {
+      target.innerHTML = `<p class="empty">暂无数据集</p>`;
+      return;
+    }
+    target.innerHTML = `
+      <table>
+        <thead>
+          <tr><th>数据集ID</th><th>名称</th><th>归属</th><th>问题</th><th>回答</th><th>外部表</th><th>操作</th></tr>
+        </thead>
+        <tbody>
+          ${datasets
+            .map(
+              (d) => `
+            <tr>
+              <td>${escapeHtml(d.dataset_id)}</td>
+              <td>${escapeHtml(d.name)}</td>
+              <td>${escapeHtml(d.owner_username || "系统")}</td>
+              <td>${formatNumber(d.questions)}</td>
+              <td>${formatNumber(d.answers)}</td>
+              <td>${formatNumber(d.external_tables)}</td>
+              <td><button class="danger" data-dataset="${escapeHtml(d.dataset_id)}">删除</button></td>
+            </tr>
+          `,
+            )
+            .join("")}
+        </tbody>
+      </table>
+    `;
+    target.querySelectorAll("button[data-dataset]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const id = button.dataset.dataset;
+        if (!window.confirm(`确认删除数据集 ${id}？该操作不可恢复。`)) return;
+        try {
+          await api(`/api/sqlite/datasets/${encodeURIComponent(id)}`, { method: "DELETE" });
+          showStatus(`已删除数据集 ${id}`, false);
+          await loadDatasetAdmin();
+        } catch (error) {
+          showStatus(`删除失败：${error.message}`, true);
+        }
+      });
+    });
+  } catch (error) {
+    showStatus(`加载数据集失败：${error.message}`, true);
   }
 }
 

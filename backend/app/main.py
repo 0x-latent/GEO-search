@@ -6,14 +6,21 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from .api.auth_routes import SESSION_COOKIE, router as auth_router
+from .api.config_routes import router as config_router
+from .api.job_routes import router as job_router, template_router
 from .api.routes import router
 from .core.paths import APP_DIR
-from .services import auth_store
+from .services import auth_store, job_store
 
+
+from .services.sqlite_dashboard import ensure_owner_column
 
 app = FastAPI(title="GEO Search Workbench", version="0.1.0")
 
 auth_store.init_db()
+ensure_owner_column()
+job_store.init_db()
+job_store.ensure_worker()
 
 app.add_middleware(
     CORSMiddleware,
@@ -40,5 +47,8 @@ async def auth_middleware(request: Request, call_next):
 
 
 app.include_router(auth_router)
+app.include_router(config_router)
+app.include_router(job_router)
+app.include_router(template_router)
 app.include_router(router)
 app.mount("/", StaticFiles(directory=APP_DIR / "static", html=True), name="static")

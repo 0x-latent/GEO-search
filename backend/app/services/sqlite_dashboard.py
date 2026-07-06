@@ -20,24 +20,79 @@ def _rows(cursor: sqlite3.Cursor) -> list[dict[str, Any]]:
     return [dict(row) for row in cursor.fetchall()]
 
 
-def _dataset_where(dataset_id: str | None, alias: str = "a") -> tuple[str, list[Any]]:
+def _scope_conditions(
+    dataset_id: str | None, allowed: list[str] | None, column: str
+) -> tuple[list[str], list[Any]]:
+    conds: list[str] = []
+    params: list[Any] = []
     if dataset_id and dataset_id != "all":
-        return f"WHERE {alias}.dataset_id = ?", [dataset_id]
-    return "", []
+        conds.append(f"{column} = ?")
+        params.append(dataset_id)
+    if allowed is not None:
+        if not allowed:
+            conds.append("1 = 0")
+        else:
+            placeholders = ",".join("?" for _ in allowed)
+            conds.append(f"{column} IN ({placeholders})")
+            params.extend(allowed)
+    return conds, params
 
 
-def _dataset_filter(dataset_id: str | None, column: str = "dataset_id") -> tuple[str, list[Any]]:
-    if dataset_id and dataset_id != "all":
-        return f"WHERE {column} = ?", [dataset_id]
-    return "", []
+def _dataset_where(
+    dataset_id: str | None, alias: str = "a", allowed: list[str] | None = None
+) -> tuple[str, list[Any]]:
+    conds, params = _scope_conditions(dataset_id, allowed, f"{alias}.dataset_id")
+    if conds:
+        return "WHERE " + " AND ".join(conds), params
+    return "", params
 
 
-def list_sqlite_datasets() -> list[dict[str, Any]]:
+def _dataset_filter(
+    dataset_id: str | None, column: str = "dataset_id", allowed: list[str] | None = None
+) -> tuple[str, list[Any]]:
+    conds, params = _scope_conditions(dataset_id, allowed, column)
+    if conds:
+        return "WHERE " + " AND ".join(conds), params
+    return "", params
+
+
+def ensure_owner_column() -> None:
+    if not GEO_SQLITE_PATH.exists():
+        return
+    with _connect() as conn:
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(datasets)")}
+        if "owner_username" not in columns:
+            conn.execute("ALTER TABLE datasets ADD COLUMN owner_username TEXT")
+            conn.commit()
+
+
+def get_owned_dataset_ids(username: str) -> list[str]:
+    if not GEO_SQLITE_PATH.exists():
+        return []
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT dataset_id FROM datasets WHERE owner_username = ?", (username,)
+        ).fetchall()
+    return [row["dataset_id"] for row in rows]
+
+
+def delete_dataset(dataset_id: str) -> None:
+    with _connect() as conn:
+        conn.execute("PRAGMA foreign_keys = ON")
+        cursor = conn.execute("DELETE FROM datasets WHERE dataset_id = ?", (dataset_id,))
+        if cursor.rowcount == 0:
+            raise ValueError(f"数据集不存在: {dataset_id}")
+        conn.commit()
+
+
+def list_sqlite_datasets(allowed: list[str] | None = None) -> list[dict[str, Any]]:
+    where, params = _dataset_filter("all", "d.dataset_id", allowed)
     with _connect() as conn:
         return _rows(
             conn.execute(
-                """
+                f"""
                 SELECT d.dataset_id, d.name, d.description, d.source_type, d.source_path,
+                       d.owner_username,
                        COUNT(DISTINCT q.question_id) AS questions,
                        COUNT(DISTINCT a.answer_id) AS answers,
                        COUNT(DISTINCT q.product_code) AS products,
@@ -54,18 +109,22 @@ def list_sqlite_datasets() -> list[dict[str, Any]]:
                     FROM external_tables
                     GROUP BY dataset_id
                 ) ext ON ext.dataset_id = d.dataset_id
+                {where}
                 GROUP BY d.dataset_id
                 ORDER BY d.dataset_id
-                """
+                """,
+                params,
             )
         )
 
 
-def build_sqlite_overview(dataset_id: str | None = None) -> dict[str, Any]:
+def build_sqlite_overview(
+    dataset_id: str | None = None, allowed: list[str] | None = None
+) -> dict[str, Any]:
     with _connect() as conn:
-        answer_where, answer_params = _dataset_where(dataset_id, "a")
-        question_where, question_params = _dataset_filter(dataset_id, "dataset_id")
-        external_where, external_params = _dataset_filter(dataset_id, "dataset_id")
+        answer_where, answer_params = _dataset_where(dataset_id, "a", allowed)
+        question_where, question_params = _dataset_filter(dataset_id, "dataset_id", allowed)
+        external_where, external_params = _dataset_filter(dataset_id, "dataset_id", allowed)
 
         cards = dict(
             conn.execute(
@@ -99,7 +158,7 @@ def build_sqlite_overview(dataset_id: str | None = None) -> dict[str, Any]:
         )
         cards.update(external)
 
-        dataset_rows = list_sqlite_datasets()
+        dataset_rows = list_sqlite_datasets(allowed)
         if dataset_id and dataset_id != "all":
             dataset_rows = [row for row in dataset_rows if row["dataset_id"] == dataset_id]
 
@@ -158,32 +217,34 @@ def build_sqlite_overview(dataset_id: str | None = None) -> dict[str, Any]:
             )
         )
 
+        source_where, source_params = _dataset_filter(dataset_id, "s.dataset_id", allowed)
         source_rows = _rows(
             conn.execute(
                 f"""
                 SELECT s.dataset_id, s.domain, COUNT(*) AS refs
                 FROM sources s
-                {('WHERE s.dataset_id = ?' if dataset_id and dataset_id != 'all' else '')}
+                {source_where}
                 GROUP BY s.dataset_id, s.domain
                 HAVING s.domain <> ''
                 ORDER BY refs DESC
                 LIMIT 30
                 """,
-                ([dataset_id] if dataset_id and dataset_id != "all" else []),
+                source_params,
             )
         )
 
+        ext_where, ext_params = _dataset_filter(dataset_id, "et.dataset_id", allowed)
         external_rows = _rows(
             conn.execute(
                 f"""
                 SELECT et.dataset_id, inf.file_name, et.table_name, et.sheet_name, et.row_count
                 FROM external_tables et
                 JOIN import_files inf ON inf.file_id = et.file_id
-                {('WHERE et.dataset_id = ?' if dataset_id and dataset_id != 'all' else '')}
+                {ext_where}
                 ORDER BY et.row_count DESC
                 LIMIT 80
                 """,
-                ([dataset_id] if dataset_id and dataset_id != "all" else []),
+                ext_params,
             )
         )
 
@@ -235,10 +296,12 @@ def build_sqlite_overview(dataset_id: str | None = None) -> dict[str, Any]:
     }
 
 
-def list_answer_samples(dataset_id: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
+def list_answer_samples(
+    dataset_id: str | None = None, limit: int = 100, allowed: list[str] | None = None
+) -> list[dict[str, Any]]:
     limit = max(1, min(limit, 500))
     with _connect() as conn:
-        where, params = _dataset_where(dataset_id, "a")
+        where, params = _dataset_where(dataset_id, "a", allowed)
         params.append(limit)
         return _rows(
             conn.execute(
@@ -265,16 +328,21 @@ def _safe_value(value: Any) -> Any:
     return value
 
 
-def _json_rows(conn: sqlite3.Connection, table_names: set[str] | None = None, dataset_id: str | None = None) -> list[dict[str, Any]]:
+def _json_rows(
+    conn: sqlite3.Connection,
+    table_names: set[str] | None = None,
+    dataset_id: str | None = None,
+    allowed: list[str] | None = None,
+) -> list[dict[str, Any]]:
     clauses = []
     params: list[Any] = []
     if table_names:
         placeholders = ",".join("?" for _ in table_names)
         clauses.append(f"et.table_name IN ({placeholders})")
         params.extend(sorted(table_names))
-    if dataset_id and dataset_id != "all":
-        clauses.append("et.dataset_id = ?")
-        params.append(dataset_id)
+    scope_conds, scope_params = _scope_conditions(dataset_id, allowed, "et.dataset_id")
+    clauses.extend(scope_conds)
+    params.extend(scope_params)
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     rows = conn.execute(
         f"""
@@ -322,15 +390,18 @@ def _yang_recommendation_strength(row: dict[str, Any]) -> str:
     return "未提及"
 
 
-def build_split_performance(dataset_id: str | None = None) -> dict[str, Any]:
+def build_split_performance(
+    dataset_id: str | None = None, allowed: list[str] | None = None
+) -> dict[str, Any]:
     with _connect() as conn:
-        mention_rows = _json_rows(conn, {"mention_report"}, dataset_id)
-        rec_rows = _json_rows(conn, {"rec_overview"}, dataset_id)
-        detail_rows = _json_rows(conn, {"brand_generic_detail"}, dataset_id)
-        category_rows = _json_rows(conn, {"recommendation_detail"}, dataset_id)
+        mention_rows = _json_rows(conn, {"mention_report"}, dataset_id, allowed)
+        rec_rows = _json_rows(conn, {"rec_overview"}, dataset_id, allowed)
+        detail_rows = _json_rows(conn, {"brand_generic_detail"}, dataset_id, allowed)
+        category_rows = _json_rows(conn, {"recommendation_detail"}, dataset_id, allowed)
 
+        yang_dataset_visible = allowed is None or "weitai_yangweishu_20260602" in allowed
         yang_rows = []
-        if not dataset_id or dataset_id in {"all", "weitai_yangweishu_20260602"}:
+        if yang_dataset_visible and (not dataset_id or dataset_id in {"all", "weitai_yangweishu_20260602"}):
             rows = conn.execute(
                 """
                 SELECT et.dataset_id, et.table_name, et.sheet_name, er.row_json

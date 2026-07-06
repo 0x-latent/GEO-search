@@ -59,7 +59,8 @@ CREATE TABLE IF NOT EXISTS datasets (
     source_path TEXT,
     created_at TEXT,
     imported_at TEXT NOT NULL,
-    metadata_json TEXT NOT NULL DEFAULT '{}'
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    owner_username TEXT
 );
 
 CREATE TABLE IF NOT EXISTS products (
@@ -267,21 +268,24 @@ def upsert_dataset(
     source_type: str,
     source_path: str,
     metadata: dict[str, Any] | None = None,
+    owner: str | None = None,
 ) -> None:
+    ensure_owner_column(conn)
     conn.execute(
         """
         INSERT INTO datasets (
             dataset_id, name, description, source_type, source_path,
-            created_at, imported_at, metadata_json
+            created_at, imported_at, metadata_json, owner_username
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(dataset_id) DO UPDATE SET
             name = excluded.name,
             description = excluded.description,
             source_type = excluded.source_type,
             source_path = excluded.source_path,
             imported_at = excluded.imported_at,
-            metadata_json = excluded.metadata_json
+            metadata_json = excluded.metadata_json,
+            owner_username = COALESCE(excluded.owner_username, datasets.owner_username)
         """,
         (
             dataset_id,
@@ -292,8 +296,15 @@ def upsert_dataset(
             now_iso(),
             now_iso(),
             json_dumps(metadata or {}),
+            owner,
         ),
     )
+
+
+def ensure_owner_column(conn: sqlite3.Connection) -> None:
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(datasets)")}
+    if "owner_username" not in columns:
+        conn.execute("ALTER TABLE datasets ADD COLUMN owner_username TEXT")
 
 
 def upsert_product(conn: sqlite3.Connection, product_code: str, product_name: str, metadata: dict[str, Any] | None = None) -> None:
@@ -545,7 +556,10 @@ def import_tabular_file(conn: sqlite3.Connection, dataset_id: str, path: Path, r
             )
     elif suffix in {".csv", ".tsv"}:
         sep = "\t" if suffix == ".tsv" else ","
-        df = pd.read_csv(path, encoding="utf-8-sig", sep=sep)
+        try:
+            df = pd.read_csv(path, encoding="utf-8-sig", sep=sep)
+        except pd.errors.EmptyDataError:
+            return imported_rows
         imported_rows += insert_external_table(
             conn,
             dataset_id,
@@ -584,6 +598,7 @@ def import_baseline(args: argparse.Namespace) -> dict[str, Any]:
         "raw_json_pipeline",
         str(Path(args.raw_dir).resolve()),
         {"question_files": [args.questions, args.questions_base]},
+        owner=getattr(args, "owner", None),
     )
 
     qmap = load_questions_map([Path(args.questions).resolve(), Path(args.questions_base).resolve()])
@@ -911,6 +926,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--analysis-dir", default=str(BASE_DIR / "results" / "analysis"))
     p.add_argument("--questions", default=str(BASE_DIR / "questions" / "questions_expanded.json"))
     p.add_argument("--questions-base", default=str(BASE_DIR / "questions" / "questions_base.json"))
+    p.add_argument("--owner", default=None, help="Owner username for this dataset (user-scoped access).")
     p.add_argument("--reset", action="store_true", help="Delete and re-import this dataset.")
 
     p = sub.add_parser("import-yangweishu", help="Import the full 三九养胃舒 source folder.")

@@ -9,7 +9,7 @@ from collections import Counter
 from typing import Optional
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BRANDS_PATH = os.path.join(BASE_DIR, "config", "brands.yaml")
+BRANDS_PATH = os.environ.get("GEO_BRANDS_FILE") or os.path.join(BASE_DIR, "config", "brands.yaml")
 
 
 def load_brand_config() -> dict:
