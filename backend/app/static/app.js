@@ -24,7 +24,7 @@ const titles = {
 const api = async (path, options) => {
   const res = await fetch(path, options);
   if (res.status === 401) {
-    window.location.replace("/login.html");
+    window.location.replace("login.html");
     throw new Error("未登录");
   }
   if (!res.ok) {
@@ -104,9 +104,9 @@ async function loadDashboard() {
     showStatus("正在加载数据...", false);
     const query = encodeURIComponent(state.datasetId);
     const [overview, answers, splits] = await Promise.all([
-      api(`/api/sqlite/overview?dataset_id=${query}`),
-      api(`/api/sqlite/answers?dataset_id=${query}&limit=160`),
-      api(`/api/sqlite/splits?dataset_id=${query}`),
+      api("/api/sqlite/overview?dataset_id=" + query),
+      api("/api/sqlite/answers?dataset_id=" + query + "&limit=160"),
+      api("/api/sqlite/splits?dataset_id=" + query),
     ]);
     state.data = overview;
     state.answers = answers;
@@ -321,7 +321,7 @@ async function loadJobs() {
 
 async function showJobLog(jobId) {
   try {
-    const result = await api(`/api/jobs/${encodeURIComponent(jobId)}/log`);
+    const result = await api("/api/jobs/" + encodeURIComponent(jobId) + "/log");
     const view = document.getElementById("job-log");
     view.hidden = false;
     view.textContent = result.log || "（暂无日志）";
@@ -463,7 +463,7 @@ async function loadDatasetAdmin() {
         const id = button.dataset.dataset;
         if (!window.confirm(`确认删除数据集 ${id}？该操作不可恢复。`)) return;
         try {
-          await api(`/api/sqlite/datasets/${encodeURIComponent(id)}`, { method: "DELETE" });
+          await api("/api/sqlite/datasets/" + encodeURIComponent(id), { method: "DELETE" });
           showStatus(`已删除数据集 ${id}`, false);
           await loadDatasetAdmin();
         } catch (error) {
@@ -482,7 +482,7 @@ async function logout() {
   } catch (err) {
     // 会话可能已过期，直接跳转
   }
-  window.location.replace("/login.html");
+  window.location.replace("login.html");
 }
 
 async function loadUsers() {
@@ -541,15 +541,15 @@ async function handleUserAction({ action, username, role }) {
   try {
     if (action === "delete") {
       if (!window.confirm(`确认删除用户 ${username}？`)) return;
-      await api(`/api/auth/users/${encodeURIComponent(username)}`, { method: "DELETE" });
+      await api("/api/auth/users/" + encodeURIComponent(username), { method: "DELETE" });
       showStatus(`已删除用户 ${username}`, false);
     } else if (action === "reset") {
       const password = window.prompt(`为 ${username} 设置新密码（至少 6 位）：`);
       if (!password) return;
-      await apiJson(`/api/auth/users/${encodeURIComponent(username)}/password`, "PUT", { password });
+      await apiJson("/api/auth/users/" + encodeURIComponent(username) + "/password", "PUT", { password });
       showStatus(`已重置 ${username} 的密码`, false);
     } else if (action === "role") {
-      await apiJson(`/api/auth/users/${encodeURIComponent(username)}/role`, "PUT", { role });
+      await apiJson("/api/auth/users/" + encodeURIComponent(username) + "/role", "PUT", { role });
       showStatus(`已调整 ${username} 的角色`, false);
     }
     await loadUsers();
@@ -579,7 +579,7 @@ async function changeOwnPassword(event) {
   try {
     await apiJson("/api/auth/me/password", "PUT", { password });
     window.alert("密码已修改，请重新登录");
-    window.location.replace("/login.html");
+    window.location.replace("login.html");
   } catch (error) {
     showStatus(`修改失败：${error.message}`, true);
   }

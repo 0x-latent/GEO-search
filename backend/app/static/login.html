@@ -119,7 +119,7 @@
       const submitBtn = document.getElementById("submit");
 
       fetch("/api/auth/me").then((res) => {
-        if (res.ok) window.location.replace("/");
+        if (res.ok) window.location.replace("./");
       });
 
       form.addEventListener("submit", async (event) => {
@@ -136,7 +136,7 @@
             }),
           });
           if (res.ok) {
-            window.location.replace("/");
+            window.location.replace("./");
             return;
           }
           const data = await res.json().catch(() => ({}));
