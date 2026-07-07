@@ -1,5 +1,10 @@
+# 基础镜像可用 build args 覆盖（国内服务器 docker.io 受限时指向镜像源，
+# 见 docs/docker部署说明.md 的 docker-compose.override.yml 示例）
+ARG NODE_IMAGE=node:20-slim
+ARG PYTHON_IMAGE=python:3.11-slim
+
 # ---- 前端构建阶段：Vue 3 + Vite，产物拷入 FastAPI 静态目录 ----
-FROM node:20-slim AS webbuild
+FROM ${NODE_IMAGE} AS webbuild
 
 WORKDIR /web
 COPY frontend/package.json frontend/package-lock.json* ./
@@ -10,7 +15,7 @@ COPY frontend/ ./
 RUN npm run build -- --outDir /web/dist --emptyOutDir
 
 # ---- 运行阶段 ----
-FROM python:3.11-slim
+FROM ${PYTHON_IMAGE}
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

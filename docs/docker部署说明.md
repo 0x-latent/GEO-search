@@ -23,6 +23,20 @@
 docker build -t geo-search-workbench:latest .
 ```
 
+## 国内服务器：docker.io 受限时
+
+基础镜像支持 build args 覆盖。在服务器的部署目录放一个
+`docker-compose.override.yml`（不进 git），compose 会自动合并：
+
+```yaml
+services:
+  geo-web:
+    build:
+      args:
+        NODE_IMAGE: docker.m.daocloud.io/library/node:20-alpine
+        PYTHON_IMAGE: docker.m.daocloud.io/library/python:3.11-slim
+```
+
 或使用 compose：
 
 ```bash
