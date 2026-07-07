@@ -9,17 +9,19 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from ..services import job_store
-from ..services.question_parser import parse_upload
+from ..services import job_store, product_master
+from ..services.question_parser import build_questions, parse_upload
 from ..services.yaml_store import load_models
 from .auth_routes import _current_user, _require_admin
 
 router = APIRouter(prefix="/api/jobs")
 
 TEMPLATE_COLUMNS = ["问题", "产品", "层级", "场景"]
+# 层级取值：病症（泛式提问，看品类是否被推荐）/ 品类（比较品牌）/ 品牌（问具体产品，测准确率和负面）
 TEMPLATE_ROWS = [
-    ["感冒了吃什么药好得快？", "感冒灵", "q1_overall", "日常用药"],
-    ["999感冒灵和连花清瘟哪个效果好？", "感冒灵", "q2_compare", ""],
+    ["感冒发烧头疼吃什么药好得快？", "999感冒灵", "病症", "感冒初期"],
+    ["感冒颗粒哪个牌子效果好？", "999感冒灵", "品类", ""],
+    ["999感冒灵怎么样？有什么副作用吗？", "999感冒灵", "品牌", ""],
 ]
 
 
@@ -31,6 +33,8 @@ class JobPayload(BaseModel):
     search_mode: str = "both"
     rounds: int = 1
     route: str | None = None
+    product_code: str | None = None
+    batch_date: str | None = None
 
 
 @router.get("/options")
@@ -53,6 +57,7 @@ def get_job_options(request: Request) -> dict[str, Any]:
     job_settings = config.get("job_settings") or {}
     return {
         "models": models,
+        "products": product_master.list_products(active_only=True),
         "max_questions": job_store.MAX_QUESTIONS,
         "default_rounds": job_settings.get("rounds", 1),
         "can_choose_route": user["role"] == "admin",
@@ -69,13 +74,44 @@ async def parse_questions_file(
     _current_user(request)
     content = await file.read()
     try:
-        questions = parse_upload(file.filename or "upload", content, default_product)
+        questions, report = parse_upload(file.filename or "upload", content, default_product)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {
         "total": len(questions),
         "questions": questions,
         "preview": questions[:20],
+        "report": report,
+    }
+
+
+class ComposePayload(BaseModel):
+    rows: list[dict[str, Any]]
+    default_product: str = ""
+
+
+@router.post("/compose")
+def compose_questions(payload: ComposePayload, request: Request) -> dict[str, Any]:
+    """在线填报：直接提交行记录（问题/产品/层级/场景），与文件上传同一套校验。"""
+    _current_user(request)
+    rows = [
+        {
+            "question": str(row.get("question") or ""),
+            "product": str(row.get("product") or ""),
+            "level": str(row.get("level") or ""),
+            "scenario": str(row.get("scenario") or ""),
+        }
+        for row in payload.rows
+    ]
+    try:
+        questions, report = build_questions(rows, payload.default_product)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "total": len(questions),
+        "questions": questions,
+        "preview": questions[:20],
+        "report": report,
     }
 
 
@@ -96,6 +132,8 @@ def create_job(payload: JobPayload, request: Request) -> dict[str, Any]:
             search_mode=payload.search_mode,
             rounds=payload.rounds,
             route=payload.route,
+            product_code=payload.product_code,
+            batch_date=payload.batch_date,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

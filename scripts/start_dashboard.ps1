@@ -1,3 +1,6 @@
+# 开发提示：前端已改为 Vue 3 + Vite（frontend/ 目录）。
+#   开发联调：本脚本起后端 + 另开终端 `cd frontend && npm run dev`（5173 端口，代理 /api）。
+#   生产形态：先 `cd frontend && npm run build`（产物落 backend/app/static），再单独跑本脚本。
 param(
     [int]$Port = 8000,
     [switch]$NoBrowser,

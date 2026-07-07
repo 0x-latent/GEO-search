@@ -6,7 +6,12 @@ import json
 import re
 from typing import Any
 
+from utils.sqlite_schema import match_stage
+
 MAX_QUESTIONS = 500
+
+# 阶段 → 问题 id 前缀：决定流水线覆盖（05 推荐抽取 / 07 准确率）和三阶段归类
+_STAGE_QID_TAG = {"symptom": "q4", "category": "q5", "brand": "q1"}
 
 # 支持的列名映射（中英文均可）
 COLUMN_ALIASES = {
@@ -46,15 +51,58 @@ def _slug(text: str, fallback: str) -> str:
     return fallback
 
 
-def _build_questions(rows: list[dict[str, str]], default_product: str) -> list[dict[str, Any]]:
+def _master_code_lookup() -> callable:
+    """产品名 → 主数据 product_code。
+
+    同一产品跨批次必须落在同一 code 上，趋势才连得起来；
+    所以先按 products 主数据（名称+别名，双向包含）匹配，匹配不上才退回哈希 slug。
+    """
+    try:
+        from . import product_master
+
+        products = product_master.list_products(active_only=False)
+    except Exception:
+        products = []
+    cache: dict[str, str | None] = {}
+
+    def resolve(name: str) -> str | None:
+        if not name:
+            return None
+        if name in cache:
+            return cache[name]
+        code = None
+        for item in products:
+            candidates = [item["product_name"], *item.get("aliases", [])]
+            if any(c and (c in name or name in c) for c in candidates):
+                code = item["product_code"]
+                break
+        cache[name] = code
+        return code
+
+    return resolve
+
+
+def build_questions(
+    rows: list[dict[str, str]], default_product: str = ""
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """行记录 → 标准问题列表 + 校验报告（层级分布/缺产品/未识别层级/去重）。"""
     questions: list[dict[str, Any]] = []
     seen: set[str] = set()
     last_product = ""
+    master_code = _master_code_lookup()
+    report = {
+        "duplicates_removed": 0,
+        "missing_product": 0,
+        "missing_level": 0,
+        "unknown_levels": set(),
+        "stage_counts": {"symptom": 0, "category": 0, "brand": 0},
+    }
     for row in rows:
         text = str(row.get("question") or "").strip()
         if not text:
             continue
         if text in seen:
+            report["duplicates_removed"] += 1
             continue
         seen.add(text)
         # 产品列空时沿用上一行（Excel 合并单元格导出后只有首行有值）
@@ -62,15 +110,25 @@ def _build_questions(rows: list[dict[str, str]], default_product: str) -> list[d
         if row_product:
             last_product = row_product
         product = row_product or last_product or str(default_product or "").strip()
+        if not product:
+            report["missing_product"] += 1
+        level = str(row.get("level") or "").strip()
+        stage = match_stage(level)
+        if not level:
+            report["missing_level"] += 1
+        elif stage is None:
+            report["unknown_levels"].add(level)
+        # 层级决定 id 前缀：病症→q4（05 推荐抽取）、品类→q5、品牌→q1（07 准确率+负面）
+        stage = stage or "symptom"
+        report["stage_counts"][stage] += 1
         index = len(questions) + 1
-        product_code = _slug(product, "custom") if product else "custom"
+        product_code = (master_code(product) or _slug(product, "custom")) if product else "custom"
         questions.append({
-            # id 带 _q4_ 使 05 推荐抽取覆盖全部用户上传问题（05 按 _q3_/_q4_/_q5_ 识别推荐类）
-            "id": f"{product_code}_q4_{index:04d}",
+            "id": f"{product_code}_{_STAGE_QID_TAG[stage]}_{index:04d}",
             "product": product,
             "product_code": product_code,
             "category": "user_upload",
-            "level": str(row.get("level") or "").strip(),
+            "level": level,
             "scenario": str(row.get("scenario") or "").strip(),
             "persona": str(row.get("persona") or "").strip(),
             "question": text,
@@ -82,7 +140,8 @@ def _build_questions(rows: list[dict[str, str]], default_product: str) -> list[d
             raise ValueError(f"问题数超过上限 {MAX_QUESTIONS}，请拆分后分批上传")
     if not questions:
         raise ValueError("未解析到任何问题，请检查文件格式（需包含“问题”或 question 列）")
-    return questions
+    report["unknown_levels"] = sorted(report["unknown_levels"])
+    return questions, report
 
 
 def _rows_to_records(rows: list[list[str]]) -> list[dict[str, str]]:
@@ -145,8 +204,10 @@ def _parse_json(content: bytes) -> list[dict[str, str]]:
     return rows
 
 
-def parse_upload(filename: str, content: bytes, default_product: str = "") -> list[dict[str, Any]]:
-    """解析上传文件为标准问题列表（id/product/level/scenario/question）。"""
+def parse_upload(
+    filename: str, content: bytes, default_product: str = ""
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """解析上传文件为标准问题列表 + 校验报告。"""
     if len(content) > 10 * 1024 * 1024:
         raise ValueError("文件超过 10MB")
     name = filename.lower()
@@ -158,4 +219,4 @@ def parse_upload(filename: str, content: bytes, default_product: str = "") -> li
         rows = _parse_json(content)
     else:
         raise ValueError("仅支持 .xlsx / .csv / .json 文件")
-    return _build_questions(rows, default_product)
+    return build_questions(rows, default_product)

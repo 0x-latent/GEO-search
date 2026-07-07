@@ -4,12 +4,17 @@
 
 镜像只包含代码、依赖和默认配置模板；运行数据和密钥通过 volume 挂载。
 
+**多阶段构建**：第一阶段用 node:20 构建 Vue 前端（`frontend/`），产物拷入
+`/app/backend/app/static` 由 FastAPI 托管；第二阶段 python:3.11 运行。
+本地不需要装 Node 也能出镜像。
+
 不要打进镜像：
 
 - `config/api_keys.yaml`
 - `results/`
 - `backend/data/`
 - `.venv/`
+- `frontend/node_modules/`
 - 原始 Excel、压缩包
 
 ## 本地构建
@@ -67,9 +72,16 @@ docker pull registry.cn-hangzhou.aliyuncs.com/<namespace>/geo-search-workbench:<
 docker compose up -d
 ```
 
+## 升级部署注意（v2 业务化改版）
+
+- 首次启动会自动迁移 SQLite schema（新增 dataset_products / metrics_* / metric_evidence 表和 datasets 批次列），并从 brands.yaml 同步产品主数据——无需手工操作。
+- 老库升级后需要跑一次物化才能出品牌总览/产品详情数据：
+  `docker compose exec geo-web python scripts/manage_geo_sqlite.py materialize --dataset-id all`
+- compose 已带 healthcheck（`/api/health`，公开路径）。
+
 ## 生产注意
 
-当前是单容器 MVP：Web 服务和脚本任务 runner 在同一个容器内。容器重启会中断正在运行的脚本任务。
+当前是单容器 MVP：Web 服务和脚本任务 runner 在同一个容器内。容器重启会中断正在运行的脚本任务（任务会在重启后自动重新入队，03/05 有断点续跑）。
 
 后续多人使用或任务量变大时，应拆成：
 

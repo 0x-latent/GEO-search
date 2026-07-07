@@ -1,15 +1,11 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
-from ..core.paths import QUESTIONS_DIR, ROOT_DIR
-from ..services.analysis_store import build_bi_overview, list_analysis_files, read_csv_preview
-from ..services.run_store import create_run, list_runs
+from ..core.paths import ROOT_DIR
 from ..services.sqlite_dashboard import (
     build_split_performance,
     build_sqlite_overview,
@@ -18,7 +14,6 @@ from ..services.sqlite_dashboard import (
     list_answer_samples,
     list_sqlite_datasets,
 )
-from ..services.task_runner import list_catalog, list_tasks, read_task_log, start_task
 from ..services.yaml_store import load_brands, load_models, save_brands
 from .auth_routes import _current_user, _require_admin
 
@@ -41,16 +36,6 @@ def _check_dataset_access(dataset_id: str, allowed: list[str] | None) -> None:
 
 class BrandsPayload(BaseModel):
     data: dict[str, Any]
-
-
-class RunPayload(BaseModel):
-    config: dict[str, Any]
-
-
-class TaskPayload(BaseModel):
-    script_key: str
-    args: list[str] = Field(default_factory=list)
-    run_id: str | None = None
 
 
 @router.get("/health")
@@ -76,77 +61,6 @@ def put_brands(payload: BrandsPayload, request: Request) -> dict[str, Any]:
 @router.get("/config/models")
 def get_models() -> dict[str, Any]:
     return load_models()
-
-
-@router.get("/questions")
-def get_questions(request: Request) -> dict[str, Any]:
-    _require_admin(request)
-    for name in ("questions_expanded.json", "questions_base.json"):
-        path = QUESTIONS_DIR / name
-        if path.exists():
-            data = json.loads(path.read_text(encoding="utf-8"))
-            return {"source": name, "total": len(data), "questions": data}
-    return {"source": None, "total": 0, "questions": []}
-
-
-@router.post("/runs")
-def create_run_config(payload: RunPayload, request: Request) -> dict[str, Any]:
-    _require_admin(request)
-    return create_run(payload.config)
-
-
-@router.get("/runs")
-def get_runs(request: Request) -> list[dict[str, Any]]:
-    _require_admin(request)
-    return list_runs()
-
-
-@router.get("/tasks/catalog")
-def get_task_catalog(request: Request) -> dict[str, Any]:
-    _require_admin(request)
-    return list_catalog()
-
-
-@router.post("/tasks")
-def post_task(payload: TaskPayload, request: Request) -> dict[str, Any]:
-    _require_admin(request)
-    try:
-        return start_task(payload.script_key, payload.args, payload.run_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-@router.get("/tasks")
-def get_tasks(request: Request) -> list[dict[str, Any]]:
-    _require_admin(request)
-    return list_tasks()
-
-
-@router.get("/tasks/{task_id}/log")
-def get_task_log(task_id: str, request: Request) -> dict[str, str]:
-    _require_admin(request)
-    return {"log": read_task_log(task_id)}
-
-
-@router.get("/analysis/files")
-def get_analysis_files(request: Request) -> list[dict[str, Any]]:
-    _require_admin(request)
-    return list_analysis_files()
-
-
-@router.get("/analysis/table/{filename}")
-def get_analysis_table(filename: str, request: Request, limit: int = 100) -> dict[str, Any]:
-    _require_admin(request)
-    try:
-        return read_csv_preview(filename, limit)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-@router.get("/bi/overview")
-def get_bi_overview(request: Request) -> dict[str, Any]:
-    _require_admin(request)
-    return build_bi_overview()
 
 
 @router.get("/sqlite/datasets")

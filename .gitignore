@@ -13,3 +13,10 @@ __pycache__/
 *.xlsx
 results/extractions/
 data/geo_datasets/*.sqlite
+
+# 前端构建
+frontend/node_modules/
+frontend/dist/
+# backend/app/static 是 vite 构建产物（npm run build 生成），不进 git
+backend/app/static/
+backend/data/backfill/

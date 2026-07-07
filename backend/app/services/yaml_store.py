@@ -35,6 +35,9 @@ def save_brands(data: dict[str, Any]) -> dict[str, str]:
     snapshot_path = RUNS_DIR / f"brands_{version}.yaml"
     _write_yaml(snapshot_path, data)
     _write_yaml(BRANDS_PATH, data)
+    from . import product_master  # 延迟导入避免循环依赖
+
+    product_master.sync_products_from_brands(data)
     return {"version": version, "snapshot": str(snapshot_path)}
 
 

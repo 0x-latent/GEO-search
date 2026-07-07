@@ -43,12 +43,17 @@ SYSTEM_PROMPT = """你是一个药品推荐信息提取专家。你的任务是�
   - "caution": 提及但附带警告或不建议
 - "reason": 推荐理由（从原文中提取，简明扼要，30字以内）
 - "category": 产品品类（如"感冒药"、"止咳药"、"皮肤药"等）
+- "sentiment": 回答对该产品的定性
+  - "positive": 正面推荐或肯定评价
+  - "neutral": 中性提及，无明显倾向
+  - "negative": 明确批评、劝退、强调风险/副作用/禁忌、说"不如某某"或"不建议使用"
 
 注意：
 1. 只提取具体的药品/产品名，不提取成分名（如"对乙酰氨基酚"是成分不是产品，除非回答中明确作为产品推荐）
 2. 如果回答说"建议就医"而未推荐具体产品，返回空数组 []
 3. "不建议使用X"算caution，不算推荐
 4. 同一产品的不同规格/剂型合并为一条
+5. sentiment 与 strength 独立判断：常规安全提示（如"遵医嘱"）算 neutral，只有针对该产品的明确负面定性才算 negative
 
 只返回JSON数组，不要任何其他文本。"""
 
@@ -78,8 +83,33 @@ def save_extract_log(log: dict):
         json.dump(log, f, ensure_ascii=False, indent=2)
 
 
+REC_TAGS = ("_q3_", "_q4_", "_q5_")           # 推荐类：进推荐排行/品类统计
+ALL_TAGS = ("_q1_", "_q2_") + REC_TAGS        # 全量：q1/q2 也抽取（捕捉品牌阶段负面提及）
+
+
+def _is_rec_qid(qid: str) -> bool:
+    return any(tag in qid for tag in REC_TAGS)
+
+
+def _qid_level(qid: str) -> str:
+    """问题ID → 层级标签（q1..q5），不认识返回空串。"""
+    for tag in ("q1", "q2", "q3", "q4", "q5"):
+        if f"_{tag}_" in qid:
+            return tag
+    return ""
+
+
+def _level_group(level: str) -> str:
+    """层级 → 汇总桶：Q1/Q2（品牌认知）、Q3/Q4（病症）、Q5（品类比较）。"""
+    if level in ("q1", "q2"):
+        return "Q1/Q2"
+    if level in ("q3", "q4"):
+        return "Q3/Q4"
+    return "Q5"
+
+
 def load_recommendation_responses() -> list:
-    """加载推荐类问题（q3/q4/q5）的应答"""
+    """加载需要 LLM 抽取的应答：q3/q4/q5（推荐类）+ q1/q2（品牌认知类，抽负面情感）"""
     responses = []
     pattern = os.path.join(RAW_DIR, "**", "*.json")
     for fpath in glob.glob(pattern, recursive=True):
@@ -89,7 +119,7 @@ def load_recommendation_responses() -> list:
             if "question_id" not in data or "answer" not in data:
                 continue
             qid = data["question_id"]
-            if "_q3_" in qid or "_q4_" in qid or "_q5_" in qid:
+            if any(tag in qid for tag in ALL_TAGS):
                 responses.append(data)
         except Exception:
             continue
@@ -122,20 +152,27 @@ async def extract_one(client, resp: dict, semaphore: asyncio.Semaphore,
     full_question = f"{SYSTEM_PROMPT}\n\n{USER_PROMPT.format(question=question, answer=answer)}"
 
     async with semaphore:
-        try:
-            result = await client.query(
-                question=full_question,
-                enable_search=False,
-                temperature=0.1,
-                max_tokens=2000,
-                json_mode=True,
-            )
-            raw_json = json.loads(result["answer"])
-            recs = raw_json if isinstance(raw_json, list) else raw_json.get("results", raw_json.get("data", []))
-        except Exception as e:
+        recs = None
+        last_error = None
+        # JSON 截断/围栏偶发，重试一次
+        for attempt in range(2):
+            try:
+                result = await client.query(
+                    question=full_question,
+                    enable_search=False,
+                    temperature=0.1,
+                    max_tokens=4000,
+                    json_mode=True,
+                )
+                raw_json = _parse_json_response(result["answer"])
+                recs = raw_json if isinstance(raw_json, list) else raw_json.get("results", raw_json.get("data", []))
+                break
+            except Exception as e:
+                last_error = e
+        if recs is None:
             counter["fail"] += 1
             if counter["fail"] <= 5:
-                print(f"  提取失败: {e}")
+                print(f"  提取失败: {last_error}")
             recs = []
 
         # 记录到日志
@@ -220,6 +257,7 @@ async def main():
                 "推荐强度": rec.get("strength", ""),
                 "推荐理由": rec.get("reason", ""),
                 "品类": rec.get("category", ""),
+                "情感": rec.get("sentiment", ""),
             })
 
     # 保存明细
@@ -231,15 +269,20 @@ async def main():
         detail_df.to_csv(detail_path, index=False, encoding="utf-8-sig")
         print(f"\n推荐提取明细 → {detail_path} ({len(detail_rows)} 条)")
 
+        # 推荐排行/稳定性等报表只统计推荐类（q3-q5），
+        # 避免品牌问答（q1/q2）的自提及污染竞品排行口径
+        rec_df = detail_df[detail_df["问题ID"].map(_is_rec_qid)]
+        rec_responses = [r for r in responses if _is_rec_qid(r.get("question_id", ""))]
+
         # 生成统计分析报表
         print("\n生成统计分析...")
-        generate_statistics(detail_df, responses)
+        generate_statistics(rec_df, rec_responses)
 
         print("\n更新04报表（基于LLM提取数据覆盖正则版本）...")
-        generate_updated_dashboard(detail_df, responses)
-        generate_updated_stability(detail_df, responses)
-        generate_updated_search_diff(detail_df, responses)
-        generate_updated_optimization(detail_df, responses)
+        generate_updated_dashboard(rec_df, rec_responses)
+        generate_updated_stability(rec_df, rec_responses)
+        generate_updated_search_diff(rec_df, rec_responses)
+        generate_updated_optimization(rec_df, rec_responses)
 
         print("\nV6框架补充报表...")
         generate_brand_generic_split(detail_df, responses)
@@ -576,6 +619,9 @@ def generate_updated_dashboard(detail_df: pd.DataFrame, responses: list):
         })
 
     df = pd.DataFrame(rows)
+    if df.empty:
+        print("  Dashboard: 无数据，跳过")
+        return
     df = df.sort_values(["产品", "模型"]).reset_index(drop=True)
     path = os.path.join(ANALYSIS_DIR, "dashboard.csv")
     df.to_csv(path, index=False, encoding="utf-8-sig")
@@ -680,6 +726,9 @@ def generate_updated_stability(detail_df: pd.DataFrame, responses: list):
         })
 
     df = pd.DataFrame(rows)
+    if df.empty:
+        print("  稳定性报表: 无多轮数据，跳过（rounds=1 时无法比较轮次）")
+        return
     df = df.sort_values(["产品", "模型", "联网", "问题ID"]).reset_index(drop=True)
 
     # 合并 answer_similarity（04脚本生成的TF-IDF相似度）
@@ -762,6 +811,9 @@ def generate_updated_search_diff(detail_df: pd.DataFrame, responses: list):
         })
 
     df = pd.DataFrame(rows)
+    if df.empty:
+        print("  联网差异报表: 无联网/非联网成对数据，跳过")
+        return
     df = df.sort_values(["产品", "模型", "问题ID"]).reset_index(drop=True)
     path = os.path.join(ANALYSIS_DIR, "search_diff_report.csv")
     df.to_csv(path, index=False, encoding="utf-8-sig")
@@ -885,6 +937,9 @@ def generate_updated_optimization(detail_df: pd.DataFrame, responses: list):
         })
 
     df = pd.DataFrame(rows)
+    if df.empty:
+        print("  优化建议报表: 无数据，跳过")
+        return
     df = df.sort_values(["优先级", "产品", "模型"]).reset_index(drop=True)
     path = os.path.join(ANALYSIS_DIR, "optimization_report.csv")
     df.to_csv(path, index=False, encoding="utf-8-sig")
@@ -956,11 +1011,7 @@ def generate_brand_generic_split(detail_df: pd.DataFrame, responses: list):
     component_kw = config.get("component_keywords", [])
     product_map = _build_product_name_map()
 
-    def _get_level(qid):
-        for tag in ["q3", "q4", "q5"]:
-            if f"_{tag}_" in qid:
-                return tag
-        return ""
+    _get_level = _qid_level
 
     def _classify(rec_product: str, cat_key: str) -> str:
         """
@@ -1002,6 +1053,7 @@ def generate_brand_generic_split(detail_df: pd.DataFrame, responses: list):
         rec_product = str(row["推荐产品"])
         strength = row["推荐强度"]
         reason = row["推荐理由"]
+        sentiment = str(row.get("情感", "") or "")
         is_recommend = 1 if strength in ("strong", "moderate") else 0
         name_type = _classify(rec_product, cat_key)
 
@@ -1017,7 +1069,9 @@ def generate_brand_generic_split(detail_df: pd.DataFrame, responses: list):
             "名称类型": name_type,
             "推荐强度": strength,
             "是否推荐": is_recommend,
-            "推荐原因": reason if is_recommend else "",
+            "情感": sentiment,
+            # 负面定性的原因也要保留（品牌阶段的负面证据链）
+            "推荐原因": reason if (is_recommend or sentiment == "negative") else "",
         })
 
     if not detail_rows:
@@ -1043,8 +1097,7 @@ def generate_brand_generic_split(detail_df: pd.DataFrame, responses: list):
         product = resp.get("product", "")
         model = resp.get("model", "")
         search = "是" if resp.get("search_enabled") else "否"
-        level_group = "Q3/Q4" if level in ("q3", "q4") else "Q5"
-        answer_totals[(product, level_group, model, search)] += 1
+        answer_totals[(product, _level_group(level), model, search)] += 1
 
     # 按名称类型分别统计提及和推荐
     summary_groups = defaultdict(lambda: {
@@ -1054,7 +1107,7 @@ def generate_brand_generic_split(detail_df: pd.DataFrame, responses: list):
         "component_m": 0,
     })
     for row in detail_rows:
-        level_group = "Q3/Q4" if row["问题层级"] in ("Q3", "Q4") else "Q5"
+        level_group = _level_group(row["问题层级"].lower())
         gk = (row["产品"], level_group, row["模型"], row["联网"])
         nt = row["名称类型"]
         is_rec = row["是否推荐"] == 1
@@ -1090,11 +1143,7 @@ def generate_unified_mention_report(detail_df: pd.DataFrame, responses: list):
     competitor_brands = set(config.get("known_brand_competitors", []))
     component_kw = config.get("component_keywords", [])
 
-    def _get_level(qid):
-        for tag in ["q3", "q4", "q5"]:
-            if f"_{tag}_" in qid:
-                return tag
-        return ""
+    _get_level = _qid_level
 
     def _classify(rec_product, cat_key):
         if any(kw in rec_product for kw in brand_999_keywords):
@@ -1136,14 +1185,14 @@ def generate_unified_mention_report(detail_df: pd.DataFrame, responses: list):
         product = resp.get("product", "")
         model = resp.get("model", "")
         search = "是" if resp.get("search_enabled") else "否"
-        level_group = "Q3/Q4" if level in ("q3", "q4") else "Q5"
-        answer_totals[(product, level_group, model, search)] += 1
+        answer_totals[(product, _level_group(level), model, search)] += 1
 
     type_counts = defaultdict(lambda: {
         "999品牌_m": 0, "999品牌_r": 0,
         "通用名_m": 0, "通用名_r": 0,
         "竞品品牌_m": 0, "竞品品牌_r": 0,
         "成分品类级_m": 0,
+        "负面": 0, "999品牌_负面": 0,
     })
     for _, row in detail_df.iterrows():
         qid = row["问题ID"]
@@ -1156,16 +1205,20 @@ def generate_unified_mention_report(detail_df: pd.DataFrame, responses: list):
             continue
         model = row["模型"]
         search = row["联网"]
-        level_group = "Q3/Q4" if level in ("q3", "q4") else "Q5"
-        gk = (product, level_group, model, search)
+        gk = (product, _level_group(level), model, search)
 
         rec_product = str(row["推荐产品"])
         nt = _classify(rec_product, cat_key)
         is_rec = row["推荐强度"] in ("strong", "moderate")
+        is_negative = str(row.get("情感", "") or "") == "negative"
 
         type_counts[gk][f"{nt}_m"] += 1
         if is_rec and nt != "成分品类级":
             type_counts[gk][f"{nt}_r"] += 1
+        if is_negative:
+            type_counts[gk]["负面"] += 1
+            if nt == "999品牌":
+                type_counts[gk]["999品牌_负面"] += 1
 
     # === 3. 合并输出 ===
     all_keys = set(answer_totals.keys()) | set(category_hits.keys())
@@ -1202,10 +1255,16 @@ def generate_unified_mention_report(detail_df: pd.DataFrame, responses: list):
         row["竞品品牌提及率"] = round(tc.get("竞品品牌_m", 0) / divisor, 3)
         row["竞品品牌推荐率"] = round(tc.get("竞品品牌_r", 0) / divisor, 3)
         row["成分品类级提及次数"] = tc.get("成分品类级_m", 0)
+        row["负面提及数"] = tc.get("负面", 0)
+        row["负面提及率"] = round(tc.get("负面", 0) / divisor, 3)
+        row["999品牌负面提及数"] = tc.get("999品牌_负面", 0)
 
         rows.append(row)
 
     df = pd.DataFrame(rows)
+    if df.empty:
+        print("  统一提及率报表: 无数据，跳过")
+        return
     df = df.sort_values(["产品", "问题层级", "模型", "联网"]).reset_index(drop=True)
     path = os.path.join(ANALYSIS_DIR, "mention_report.csv")
     df.to_csv(path, index=False, encoding="utf-8-sig")

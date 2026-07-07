@@ -1,0 +1,58 @@
+:root {
+  --geo-teal: #0f766e;
+  --geo-ink: #1f2933;
+  --geo-muted: #66717d;
+  --geo-bg: #f5f6f8;
+}
+
+body {
+  margin: 0;
+  background: var(--geo-bg);
+  color: var(--geo-ink);
+  font-family: "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+}
+
+.page {
+  padding: 20px 24px 40px;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+.page-header {
+  margin-bottom: 16px;
+}
+
+.page-header h1 {
+  font-size: 20px;
+  margin: 0 0 4px;
+}
+
+.page-header p {
+  margin: 0;
+  color: var(--geo-muted);
+  font-size: 13px;
+}
+
+.metric-value {
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-label {
+  font-size: 12px;
+  color: var(--geo-muted);
+}
+
+.muted {
+  color: var(--geo-muted);
+}
+
+.answer-text {
+  white-space: pre-wrap;
+  line-height: 1.7;
+  font-size: 14px;
+  max-height: 55vh;
+  overflow-y: auto;
+  padding-right: 8px;
+}

@@ -56,16 +56,6 @@ def _dataset_filter(
     return "", params
 
 
-def ensure_owner_column() -> None:
-    if not GEO_SQLITE_PATH.exists():
-        return
-    with _connect() as conn:
-        columns = {row["name"] for row in conn.execute("PRAGMA table_info(datasets)")}
-        if "owner_username" not in columns:
-            conn.execute("ALTER TABLE datasets ADD COLUMN owner_username TEXT")
-            conn.commit()
-
-
 def get_owned_dataset_ids(username: str) -> list[str]:
     if not GEO_SQLITE_PATH.exists():
         return []
@@ -94,7 +84,7 @@ def list_sqlite_datasets(allowed: list[str] | None = None) -> list[dict[str, Any
             conn.execute(
                 f"""
                 SELECT d.dataset_id, d.name, d.description, d.source_type, d.source_path,
-                       d.owner_username,
+                       d.owner_username, d.product_code, d.batch_date, d.question_set_id,
                        COALESCE(q.questions, 0) AS questions,
                        COALESCE(a.answers, 0) AS answers,
                        COALESCE(q.products, 0) AS products,
@@ -333,48 +323,6 @@ def list_answer_samples(
         )
 
 
-def _safe_value(value: Any) -> Any:
-    if value != value:
-        return None
-    return value
-
-
-def _json_rows(
-    conn: sqlite3.Connection,
-    table_names: set[str] | None = None,
-    dataset_id: str | None = None,
-    allowed: list[str] | None = None,
-) -> list[dict[str, Any]]:
-    clauses = []
-    params: list[Any] = []
-    if table_names:
-        placeholders = ",".join("?" for _ in table_names)
-        clauses.append(f"et.table_name IN ({placeholders})")
-        params.extend(sorted(table_names))
-    scope_conds, scope_params = _scope_conditions(dataset_id, allowed, "et.dataset_id")
-    clauses.extend(scope_conds)
-    params.extend(scope_params)
-    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
-    rows = conn.execute(
-        f"""
-        SELECT et.dataset_id, et.table_name, et.sheet_name, er.row_json
-        FROM external_rows er
-        JOIN external_tables et ON et.table_id = er.table_id
-        {where}
-        """,
-        params,
-    ).fetchall()
-    result = []
-    for row in rows:
-        payload = __import__("json").loads(row["row_json"])
-        cleaned = {key: _safe_value(value) for key, value in payload.items()}
-        cleaned["_dataset_id"] = row["dataset_id"]
-        cleaned["_table_name"] = row["table_name"]
-        cleaned["_sheet_name"] = row["sheet_name"]
-        result.append(cleaned)
-    return result
-
-
 def _num(value: Any) -> float:
     try:
         if value is None or value == "":
@@ -401,265 +349,202 @@ def _yang_recommendation_strength(row: dict[str, Any]) -> str:
     return "未提及"
 
 
+_SEARCH_LABEL = {"1": "是", "0": "否", "agg": "汇总"}
+
+
+def _search_label(value: Any) -> str:
+    return _SEARCH_LABEL.get(str(value), str(value))
+
+
+def _json(value: Any) -> dict[str, Any]:
+    import json
+
+    try:
+        return json.loads(value or "{}")
+    except (TypeError, ValueError):
+        return {}
+
+
+def _product_labels(conn: sqlite3.Connection) -> dict[tuple[str, str], str]:
+    rows = conn.execute(
+        "SELECT DISTINCT dataset_id, product_code, product_name FROM questions"
+    ).fetchall()
+    return {
+        (row["dataset_id"], row["product_code"] or ""): row["product_name"] or row["product_code"] or ""
+        for row in rows
+    }
+
+
 def build_split_performance(
     dataset_id: str | None = None, allowed: list[str] | None = None
 ) -> dict[str, Any]:
+    """拆分表现：读物化表（metrics_* / metric_evidence），保持旧 JSON 形状。
+
+    聚合已在导入时由 `manage_geo_sqlite.py materialize` 落库，这里只做查询和
+    形状映射；未物化的数据集返回空（请先跑 materialize）。
+    """
     with _connect() as conn:
-        mention_rows = _json_rows(conn, {"mention_report"}, dataset_id, allowed)
-        rec_rows = _json_rows(conn, {"rec_overview"}, dataset_id, allowed)
-        detail_rows = _json_rows(conn, {"brand_generic_detail"}, dataset_id, allowed)
-        category_rows = _json_rows(conn, {"recommendation_detail"}, dataset_id, allowed)
+        labels = _product_labels(conn)
 
-        yang_dataset_visible = allowed is None or "weitai_yangweishu_20260602" in allowed
-        yang_rows = []
-        if yang_dataset_visible and (not dataset_id or dataset_id in {"all", "weitai_yangweishu_20260602"}):
-            rows = conn.execute(
-                """
-                SELECT et.dataset_id, et.table_name, et.sheet_name, er.row_json
-                FROM external_rows er
-                JOIN external_tables et ON et.table_id = er.table_id
-                WHERE et.dataset_id = 'weitai_yangweishu_20260602'
-                  AND et.table_name LIKE '养胃舒-%汇总统计数据%'
-                  AND et.sheet_name <> '字段说明'
-                """
-            ).fetchall()
-            for row in rows:
-                payload = __import__("json").loads(row["row_json"])
-                payload = {key: _safe_value(value) for key, value in payload.items()}
-                payload["_dataset_id"] = row["dataset_id"]
-                payload["_table_name"] = row["table_name"]
-                payload["_sheet_name"] = row["sheet_name"]
-                if "提问词" in payload and "AI模型" in payload and "目标品牌" in payload:
-                    yang_rows.append(payload)
+        def label_of(ds: str, code: str, extra: dict[str, Any]) -> str:
+            return extra.get("label") or labels.get((ds, code or ""), code or "")
 
+        where_ms, params_ms = _dataset_filter(dataset_id, "dataset_id", allowed)
+        summary_rows = _rows(conn.execute(
+            f"SELECT * FROM metrics_summary {where_ms}", params_ms
+        ))
+        rec_rows = _rows(conn.execute(
+            f"SELECT * FROM metrics_recommendation {where_ms}", params_ms
+        ))
+        where_ev, params_ev = _dataset_filter(dataset_id, "dataset_id", allowed)
+        type_rows = _rows(conn.execute(
+            f"""
+            SELECT dataset_id, product_code, question_level, model, search_enabled, name_type,
+                   COUNT(*) AS entries,
+                   SUM(CASE WHEN strength = 'strong' THEN 1 ELSE 0 END) AS strong,
+                   COUNT(DISTINCT CASE WHEN rec_product <> '' THEN rec_product END) AS rec_products
+            FROM metric_evidence
+            {where_ev} {'AND' if where_ev else 'WHERE'} evidence_type = 'recommendation'
+            GROUP BY dataset_id, product_code, question_level, model, search_enabled, name_type
+            """,
+            params_ev,
+        ))
+        detail_rows = _rows(conn.execute(
+            f"""
+            SELECT * FROM metric_evidence
+            {where_ev} {'AND' if where_ev else 'WHERE'} evidence_type = 'recommendation'
+            LIMIT 1500
+            """,
+            params_ev,
+        ))
+        yang_evidence = _rows(conn.execute(
+            f"""
+            SELECT * FROM metric_evidence
+            {where_ev} {'AND' if where_ev else 'WHERE'} evidence_type = 'yang_metric'
+            """,
+            params_ev,
+        ))
+
+    # ---- mention_summary：标准 mention 行 + 养胃舒目标品牌行 ----
     mention_summary = []
-    for row in mention_rows:
+    for row in summary_rows:
+        extra = _json(row.get("extra_json"))
+        if extra.get("_source") != "mention":
+            continue
         mention_summary.append({
-            "dataset_id": row["_dataset_id"],
-            "产品": row.get("产品"),
-            "问题层级": row.get("问题层级"),
-            "模型": row.get("模型"),
-            "联网": row.get("联网"),
-            "总回答数": row.get("总回答数"),
-            "品类提及率": row.get("品类提及率"),
-            "999品牌提及率": row.get("999品牌提及率"),
-            "999品牌推荐率": row.get("999品牌推荐率"),
-            "通用名提及率": row.get("通用名提及率"),
-            "通用名推荐率": row.get("通用名推荐率"),
-            "竞品品牌提及率": row.get("竞品品牌提及率"),
-            "竞品品牌推荐率": row.get("竞品品牌推荐率"),
+            "dataset_id": row["dataset_id"],
+            "产品": label_of(row["dataset_id"], row["product_code"], extra),
+            "问题层级": row["question_level"],
+            "模型": row["model"],
+            "联网": _search_label(row["search_enabled"]),
+            "总回答数": row["total_answers"],
+            "品类提及率": row["category_mention_rate"],
+            "999品牌提及率": row["brand_mention_rate"],
+            "999品牌推荐率": row["brand_rec_rate"],
+            "通用名提及率": row["generic_mention_rate"],
+            "通用名推荐率": row["generic_rec_rate"],
+            "竞品品牌提及率": row["competitor_mention_rate"],
+            "竞品品牌推荐率": row["competitor_rec_rate"],
+            "负面提及数": row["negative_count"],
+            "负面提及率": row["negative_rate"],
         })
 
-    rec_overview = [
-        {
-            "dataset_id": row["_dataset_id"],
-            "产品": row.get("产品"),
-            "模型": row.get("模型"),
-            "联网": row.get("联网"),
-            "排名": row.get("排名"),
-            "被推荐产品": row.get("被推荐产品"),
-            "名称类型": row.get("名称类型"),
-            "提及次数": row.get("提及次数"),
-            "提及率": row.get("提及率"),
-            "强推荐次数": row.get("强推荐次数"),
-            "强推荐率": row.get("强推荐率"),
-            "可选次数": row.get("可选次数"),
-        }
-        for row in rec_rows
-    ]
-    rec_overview.sort(key=lambda item: (_num(item.get("提及次数")), _num(item.get("强推荐率"))), reverse=True)
-
-    product_type: dict[tuple[Any, ...], dict[str, Any]] = {}
-    for row in detail_rows:
-        key = (
-            row.get("_dataset_id"),
-            row.get("产品"),
-            row.get("问题层级"),
-            row.get("模型"),
-            row.get("联网"),
-            row.get("名称类型"),
-        )
-        item = product_type.setdefault(
-            key,
-            {
-                "dataset_id": key[0],
-                "产品": key[1],
-                "问题层级": key[2],
-                "模型": key[3],
-                "联网": key[4],
-                "名称类型": key[5],
-                "推荐条目数": 0,
-                "强推荐数": 0,
-                "涉及推荐产品数": set(),
-            },
-        )
-        item["推荐条目数"] += 1
-        if row.get("推荐强度") == "strong":
-            item["强推荐数"] += 1
-        if row.get("推荐产品"):
-            item["涉及推荐产品数"].add(row.get("推荐产品"))
-    type_summary = []
-    for item in product_type.values():
-        item = dict(item)
-        item["涉及推荐产品数"] = len(item["涉及推荐产品数"])
-        item["强推荐占比"] = round(item["强推荐数"] / item["推荐条目数"], 4) if item["推荐条目数"] else 0
-        type_summary.append(item)
-    type_summary.sort(key=lambda item: item["推荐条目数"], reverse=True)
-
-    category_summary: dict[tuple[Any, ...], dict[str, Any]] = {}
-    for row in category_rows:
-        key = (row.get("_dataset_id"), row.get("产品"), row.get("模型"), row.get("联网"), row.get("品类"))
-        item = category_summary.setdefault(
-            key,
-            {
-                "dataset_id": key[0],
-                "产品": key[1],
-                "模型": key[2],
-                "联网": key[3],
-                "品类": key[4],
-                "推荐次数": 0,
-                "强推荐数": 0,
-            },
-        )
-        item["推荐次数"] += 1
-        if row.get("推荐强度") == "strong":
-            item["强推荐数"] += 1
-    category_summary_rows = sorted(category_summary.values(), key=lambda item: item["推荐次数"], reverse=True)
-
-    question_details = [
-        {
-            "dataset_id": row["_dataset_id"],
-            "问题ID": row.get("问题ID"),
-            "产品": row.get("产品"),
-            "问题层级": row.get("问题层级"),
-            "模型": row.get("模型"),
-            "联网": row.get("联网"),
-            "轮次": row.get("轮次"),
-            "推荐排名": row.get("推荐排名"),
-            "推荐产品": row.get("推荐产品"),
-            "名称类型": row.get("名称类型"),
-            "推荐强度": row.get("推荐强度"),
-            "推荐原因": row.get("推荐原因"),
-        }
-        for row in detail_rows[:1500]
-    ]
-
-    yang_agg: dict[tuple[Any, ...], dict[str, Any]] = {}
-    yang_question_rows = []
-    for row in yang_rows:
-        source_level = row["_table_name"].replace("养胃舒-", "").split("汇总统计数据")[0]
-        key = (row["_dataset_id"], source_level, row.get("AI模型"), row.get("目标品牌"))
-        item = yang_agg.setdefault(
-            key,
-            {
-                "dataset_id": key[0],
-                "层级": key[1],
-                "模型": key[2],
-                "目标品牌": key[3],
-                "样本数": 0,
-                "_visibility": [],
-                "_top3": [],
-                "_first": [],
-                "_rank": [],
-            },
-        )
-        item["样本数"] += 1
-        item["_visibility"].append(_num(row.get("能见度")))
-        if row.get("前三率") is not None:
-            item["_top3"].append(_num(row.get("前三率")))
-        if row.get("首位率") is not None:
-            item["_first"].append(_num(row.get("首位率")))
-        rank = _num(row.get("位次"))
-        if rank > 0:
-            item["_rank"].append(rank)
-        yang_question_rows.append({
-            "dataset_id": row["_dataset_id"],
-            "层级": source_level,
-            "提问词": row.get("提问词"),
-            "模型": row.get("AI模型"),
-            "目标品牌": row.get("目标品牌"),
-            "能见度": row.get("能见度"),
-            "位次": row.get("位次"),
-            "前三率": row.get("前三率"),
-            "首位率": row.get("首位率"),
-            "轮数": row.get("轮数"),
-        })
+    yang_rec_rows = [r for r in rec_rows if r["name_type"] == "目标品牌"]
+    std_rec_rows = [r for r in rec_rows if r["name_type"] not in ("目标品牌", "品类")]
+    cat_rec_rows = [r for r in rec_rows if r["name_type"] == "品类"]
 
     yang_summary = []
-    for item in yang_agg.values():
+    for row in yang_rec_rows:
+        extra = _json(row.get("extra_json"))
         yang_summary.append({
-            "dataset_id": item["dataset_id"],
-            "层级": item["层级"],
-            "模型": item["模型"],
-            "目标品牌": item["目标品牌"],
-            "样本数": item["样本数"],
-            "平均能见度": _avg(item["_visibility"]),
-            "平均前三率": _avg(item["_top3"]),
-            "平均首位率": _avg(item["_first"]),
-            "平均位次": _avg(item["_rank"]),
+            "dataset_id": row["dataset_id"],
+            "层级": row["question_level"],
+            "模型": row["model"],
+            "目标品牌": row["rec_product"],
+            "样本数": extra.get("样本数"),
+            "平均能见度": row["mention_rate"],
+            "平均前三率": row["strong_rate"],
+            "平均首位率": extra.get("平均首位率"),
+            "平均位次": extra.get("平均位次"),
         })
     yang_summary.sort(key=lambda item: (_num(item.get("平均能见度")), _num(item.get("平均前三率"))), reverse=True)
 
-    yang_mention_summary = [
-        {
-            "dataset_id": item["dataset_id"],
+    mention_summary.extend({
+        "dataset_id": item["dataset_id"],
+        "产品": "养胃舒专项",
+        "问题层级": item["层级"],
+        "模型": item["模型"],
+        "联网": "汇总",
+        "总回答数": item["样本数"],
+        "目标品牌": item["目标品牌"],
+        "目标品牌提及率": item["平均能见度"],
+        "目标品牌前三率": item["平均前三率"],
+        "目标品牌首位率": item["平均首位率"],
+        "平均位次": item["平均位次"],
+    } for item in yang_summary)
+
+    # ---- rec_overview：标准推荐排行 + 养胃舒排行 ----
+    rec_overview = []
+    for row in std_rec_rows:
+        extra = _json(row.get("extra_json"))
+        rec_overview.append({
+            "dataset_id": row["dataset_id"],
+            "产品": label_of(row["dataset_id"], row["product_code"], extra),
+            "模型": row["model"],
+            "联网": _search_label(row["search_enabled"]),
+            "排名": row["rank"],
+            "被推荐产品": row["rec_product"],
+            "名称类型": row["name_type"],
+            "提及次数": row["mention_count"],
+            "提及率": row["mention_rate"],
+            "强推荐次数": row["strong_count"],
+            "强推荐率": row["strong_rate"],
+            "可选次数": extra.get("可选次数"),
+        })
+    for row in yang_rec_rows:
+        extra = _json(row.get("extra_json"))
+        rec_overview.append({
+            "dataset_id": row["dataset_id"],
             "产品": "养胃舒专项",
-            "问题层级": item["层级"],
-            "模型": item["模型"],
+            "问题层级": row["question_level"],
+            "模型": row["model"],
             "联网": "汇总",
-            "总回答数": item["样本数"],
-            "目标品牌": item["目标品牌"],
-            "目标品牌提及率": item["平均能见度"],
-            "目标品牌前三率": item["平均前三率"],
-            "目标品牌首位率": item["平均首位率"],
-            "平均位次": item["平均位次"],
-        }
-        for item in yang_summary
-    ]
-    mention_summary.extend(yang_mention_summary)
-
-    yang_rank_groups: dict[tuple[Any, ...], list[dict[str, Any]]] = defaultdict(list)
-    for item in yang_summary:
-        yang_rank_groups[(item["dataset_id"], item["层级"], item["模型"])].append(item)
-
-    yang_rec_overview = []
-    for (_dataset_id, _level, _model), items in yang_rank_groups.items():
-        ranked = sorted(
-            items,
-            key=lambda item: (
-                _num(item.get("平均能见度")),
-                _num(item.get("平均前三率")),
-                _num(item.get("平均首位率")),
-            ),
-            reverse=True,
-        )
-        for index, item in enumerate(ranked, start=1):
-            mention_count = round(_num(item.get("平均能见度")) * _num(item.get("样本数")), 2)
-            top3_count = min(round(_num(item.get("平均前三率")) * _num(item.get("样本数")), 2), mention_count)
-            yang_rec_overview.append({
-                "dataset_id": item["dataset_id"],
-                "产品": "养胃舒专项",
-                "问题层级": item["层级"],
-                "模型": item["模型"],
-                "联网": "汇总",
-                "排名": index,
-                "被推荐产品": item["目标品牌"],
-                "名称类型": "目标品牌",
-                "提及次数": mention_count,
-                "提及率": item["平均能见度"],
-                "强推荐次数": top3_count,
-                "强推荐率": item["平均前三率"],
-                "平均首位率": item["平均首位率"],
-                "平均位次": item["平均位次"],
-                "可选次数": item["样本数"],
-            })
-    rec_overview.extend(yang_rec_overview)
+            "排名": row["rank"],
+            "被推荐产品": row["rec_product"],
+            "名称类型": "目标品牌",
+            "提及次数": row["mention_count"],
+            "提及率": row["mention_rate"],
+            "强推荐次数": row["strong_count"],
+            "强推荐率": row["strong_rate"],
+            "平均首位率": extra.get("平均首位率"),
+            "平均位次": extra.get("平均位次"),
+            "可选次数": extra.get("样本数"),
+        })
     rec_overview.sort(key=lambda item: (_num(item.get("提及次数")), _num(item.get("强推荐率"))), reverse=True)
 
-    for (_dataset_id, level, model), items in yang_rank_groups.items():
+    # ---- type_summary：名称类型汇总（SQL 聚合证据表） + 养胃舒 ----
+    type_summary = []
+    for row in type_rows:
+        entries = row["entries"] or 0
+        type_summary.append({
+            "dataset_id": row["dataset_id"],
+            "产品": labels.get((row["dataset_id"], row["product_code"] or ""), row["product_code"]),
+            "问题层级": row["question_level"],
+            "模型": row["model"],
+            "联网": _search_label(row["search_enabled"]),
+            "名称类型": row["name_type"],
+            "推荐条目数": entries,
+            "强推荐数": row["strong"] or 0,
+            "强推荐占比": round((row["strong"] or 0) / entries, 4) if entries else 0,
+            "涉及推荐产品数": row["rec_products"] or 0,
+        })
+    yang_type_groups: dict[tuple[Any, ...], list[dict[str, Any]]] = defaultdict(list)
+    for item in yang_summary:
+        yang_type_groups[(item["dataset_id"], item["层级"], item["模型"])].append(item)
+    for (ds, level, model), items in yang_type_groups.items():
         strong_count = sum(1 for item in items if _num(item.get("平均前三率")) > 0)
         type_summary.append({
-            "dataset_id": _dataset_id,
+            "dataset_id": ds,
             "产品": "养胃舒专项",
             "问题层级": level,
             "模型": model,
@@ -672,9 +557,22 @@ def build_split_performance(
         })
     type_summary.sort(key=lambda item: item["推荐条目数"], reverse=True)
 
+    # ---- category_summary：品类结构 + 养胃舒层级汇总 ----
+    category_summary_rows = []
+    for row in cat_rec_rows:
+        extra = _json(row.get("extra_json"))
+        category_summary_rows.append({
+            "dataset_id": row["dataset_id"],
+            "产品": label_of(row["dataset_id"], row["product_code"], extra),
+            "模型": row["model"],
+            "联网": _search_label(row["search_enabled"]),
+            "品类": row["rec_product"],
+            "推荐次数": row["mention_count"],
+            "强推荐数": row["strong_count"],
+        })
     yang_category: dict[tuple[Any, ...], dict[str, Any]] = {}
-    for item in yang_rec_overview:
-        key = (item["dataset_id"], item["产品"], item["模型"], item["联网"], item["问题层级"])
+    for row in yang_rec_rows:
+        key = (row["dataset_id"], "养胃舒专项", row["model"], "汇总", row["question_level"])
         bucket = yang_category.setdefault(
             key,
             {
@@ -687,29 +585,58 @@ def build_split_performance(
                 "强推荐数": 0,
             },
         )
-        bucket["推荐次数"] += _num(item.get("提及次数"))
-        bucket["强推荐数"] += _num(item.get("强推荐次数"))
+        bucket["推荐次数"] += _num(row["mention_count"])
+        bucket["强推荐数"] += _num(row["strong_count"])
     category_summary_rows.extend(yang_category.values())
     category_summary_rows.sort(key=lambda item: _num(item["推荐次数"]), reverse=True)
 
-    yang_question_details = [
-        {
+    # ---- question_details：推荐明细（限 1500） + 养胃舒逐题指标 ----
+    question_details = []
+    for row in detail_rows:
+        payload = _json(row.get("payload_json"))
+        question_details.append({
             "dataset_id": row["dataset_id"],
-            "问题ID": "",
-            "产品": "养胃舒专项",
-            "问题层级": row["层级"],
-            "模型": row["模型"],
-            "联网": "汇总",
-            "轮次": row.get("轮数"),
-            "推荐排名": row.get("位次"),
-            "推荐产品": row.get("目标品牌"),
-            "名称类型": "目标品牌",
-            "推荐强度": _yang_recommendation_strength(row),
-            "推荐原因": f"提问词：{row.get('提问词')}；能见度：{row.get('能见度')}；前三率：{row.get('前三率')}；首位率：{row.get('首位率')}",
-        }
-        for row in yang_question_rows
-    ]
-    question_details.extend(yang_question_details)
+            "问题ID": row["question_id"],
+            "产品": payload.get("label") or labels.get((row["dataset_id"], row["product_code"] or ""), ""),
+            "问题层级": row["question_level"],
+            "模型": row["model"],
+            "联网": "是" if row["search_enabled"] else "否",
+            "轮次": row["round"],
+            "推荐排名": row["rank"],
+            "推荐产品": row["rec_product"],
+            "名称类型": row["name_type"],
+            "推荐强度": row["strength"],
+            "推荐原因": row["detail"],
+        })
+    yang_question_rows = []
+    for row in yang_evidence:
+        payload = _json(row.get("payload_json"))
+        yang_question_rows.append({
+            "dataset_id": row["dataset_id"],
+            "层级": row["question_level"],
+            "提问词": row["detail"],
+            "模型": row["model"],
+            "目标品牌": row["rec_product"],
+            "能见度": payload.get("能见度"),
+            "位次": payload.get("位次"),
+            "前三率": payload.get("前三率"),
+            "首位率": payload.get("首位率"),
+            "轮数": payload.get("轮数"),
+        })
+    question_details.extend({
+        "dataset_id": row["dataset_id"],
+        "问题ID": "",
+        "产品": "养胃舒专项",
+        "问题层级": row["层级"],
+        "模型": row["模型"],
+        "联网": "汇总",
+        "轮次": row.get("轮数"),
+        "推荐排名": row.get("位次"),
+        "推荐产品": row.get("目标品牌"),
+        "名称类型": "目标品牌",
+        "推荐强度": _yang_recommendation_strength(row),
+        "推荐原因": f"提问词：{row.get('提问词')}；能见度：{row.get('能见度')}；前三率：{row.get('前三率')}；首位率：{row.get('首位率')}",
+    } for row in yang_question_rows)
 
     return {
         "mention_summary": mention_summary,

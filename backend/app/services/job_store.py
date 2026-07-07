@@ -14,7 +14,7 @@ from typing import Any
 from uuid import uuid4
 
 from ..core.paths import CONFIG_DIR, DATA_DIR, ROOT_DIR, SCRIPTS_DIR
-from .user_config_store import user_brands_path
+from .user_config_store import GLOBAL_KB_PATH, user_brands_path, user_kb_path
 
 JOBS_DB_PATH = DATA_DIR / "jobs.sqlite"
 JOBS_DIR = DATA_DIR / "jobs"
@@ -26,6 +26,7 @@ STAGES = [
     ("collect", "03_query_models.py", True),
     ("analyze", "04_analyze_results.py", False),
     ("extract", "05_extract_recommendations.py", False),
+    ("verify", "07_verify_accuracy.py", False),
 ]
 
 _QUEUE: "queue.Queue[str]" = queue.Queue()
@@ -61,10 +62,17 @@ def init_db() -> None:
                 error TEXT,
                 created_at TEXT NOT NULL,
                 started_at TEXT,
-                finished_at TEXT
+                finished_at TEXT,
+                product_code TEXT,
+                batch_date TEXT
             )
             """
         )
+        # 已有库的惰性迁移
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(jobs)")}
+        for name in ("product_code", "batch_date"):
+            if name not in columns:
+                conn.execute(f"ALTER TABLE jobs ADD COLUMN {name} TEXT")
 
 
 def _now() -> str:
@@ -115,6 +123,8 @@ def create_job(
     search_mode: str = "both",
     rounds: int = 1,
     route: str | None = None,
+    product_code: str | None = None,
+    batch_date: str | None = None,
 ) -> dict[str, Any]:
     if not questions:
         raise ValueError("问题列表为空")
@@ -128,6 +138,19 @@ def create_job(
     # 链路控制：普通用户强制走中继；admin 可显式选 direct
     if role != "admin" or route not in ("relay", "direct"):
         route = "relay"
+    # 批次归属：产品必须在主数据中（趋势锚点），批次日期默认当天
+    product_code = (product_code or "").strip() or None
+    if product_code:
+        from . import product_master
+
+        active = {p["product_code"] for p in product_master.list_products(active_only=True)}
+        if product_code not in active:
+            raise ValueError(f"产品不在主数据中：{product_code}（请先在品牌配置里维护）")
+    batch_date = (batch_date or "").strip() or datetime.now().strftime("%Y-%m-%d")
+    try:
+        datetime.strptime(batch_date, "%Y-%m-%d")
+    except ValueError:
+        raise ValueError("batch_date 格式必须是 YYYY-MM-DD")
 
     job_id = f"job_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:6]}"
     dataset_id = f"user_{username}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -142,8 +165,9 @@ def create_job(
             """
             INSERT INTO jobs (
                 job_id, username, dataset_id, dataset_name, status, models_json,
-                model_overrides_json, search_mode, rounds, route, question_count, created_at
-            ) VALUES (?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?)
+                model_overrides_json, search_mode, rounds, route, question_count,
+                created_at, product_code, batch_date
+            ) VALUES (?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 job_id,
@@ -157,6 +181,8 @@ def create_job(
                 route,
                 len(questions),
                 _now(),
+                product_code,
+                batch_date,
             ),
         )
 
@@ -210,6 +236,10 @@ def _stage_env(job: dict[str, Any], job_dir: Path) -> dict[str, str]:
     brands = user_brands_path(job["username"])
     if brands is not None:
         env["GEO_BRANDS_FILE"] = str(brands)
+    # 07 准确率校验：优先用户知识库，放宽层级到全部（用户上传问题统一是 q4 前缀）
+    kb = user_kb_path(job["username"]) or GLOBAL_KB_PATH
+    env["GEO_KB_FILE"] = str(kb)
+    env["GEO_ACCURACY_LEVELS"] = "all"
     return env
 
 
@@ -272,11 +302,29 @@ def _run_job(job_id: str) -> None:
         "--owner", job["username"],
         "--reset",
     ]
+    if job.get("product_code"):
+        import_cmd += ["--product-code", job["product_code"]]
+    if job.get("batch_date"):
+        import_cmd += ["--batch-date", job["batch_date"]]
     exit_code = _run_stage("import", import_cmd, env, log_path)
     if exit_code != 0:
         _update_job(
             job_id, status="failed", stage="import",
             error=f"入库失败 (exit {exit_code})", finished_at=_now(),
+        )
+        return
+
+    # 物化指标（品牌总览/产品详情/趋势的数据源）——失败则新页面无数据，按失败处理
+    _update_job(job_id, stage="materialize")
+    materialize_cmd = [
+        sys.executable, str(SCRIPTS_DIR / "manage_geo_sqlite.py"), "materialize",
+        "--dataset-id", job["dataset_id"],
+    ]
+    exit_code = _run_stage("materialize", materialize_cmd, env, log_path)
+    if exit_code != 0:
+        _update_job(
+            job_id, status="failed", stage="materialize",
+            error=f"指标物化失败 (exit {exit_code})", finished_at=_now(),
         )
         return
 

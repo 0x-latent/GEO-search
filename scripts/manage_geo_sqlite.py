@@ -14,6 +14,7 @@ import math
 import re
 import shutil
 import sqlite3
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -21,8 +22,11 @@ from urllib.parse import urlparse
 
 import pandas as pd
 
-
 BASE_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(BASE_DIR))
+
+from utils.sqlite_schema import ensure_schema, stage_for_level  # noqa: E402
+
 DEFAULT_DB = BASE_DIR / "data" / "geo_datasets" / "geo_answers.sqlite"
 
 YANGWEISHU_LEVEL_MAP = {
@@ -46,127 +50,6 @@ MODEL_MAP = {
     "hunyuan": ("hunyuan", "腾讯混元"),
     "qwen": ("qwen", "通义千问"),
 }
-
-
-SCHEMA = """
-PRAGMA foreign_keys = ON;
-
-CREATE TABLE IF NOT EXISTS datasets (
-    dataset_id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    description TEXT,
-    source_type TEXT NOT NULL,
-    source_path TEXT,
-    created_at TEXT,
-    imported_at TEXT NOT NULL,
-    metadata_json TEXT NOT NULL DEFAULT '{}',
-    owner_username TEXT
-);
-
-CREATE TABLE IF NOT EXISTS products (
-    product_code TEXT PRIMARY KEY,
-    product_name TEXT NOT NULL,
-    metadata_json TEXT NOT NULL DEFAULT '{}'
-);
-
-CREATE TABLE IF NOT EXISTS questions (
-    dataset_id TEXT NOT NULL,
-    question_id TEXT NOT NULL,
-    product_code TEXT,
-    product_name TEXT,
-    category TEXT,
-    level TEXT,
-    source_level TEXT,
-    scenario TEXT,
-    question_text TEXT NOT NULL,
-    has_brand_name INTEGER NOT NULL DEFAULT 0,
-    is_variant INTEGER NOT NULL DEFAULT 0,
-    variant_of TEXT,
-    metadata_json TEXT NOT NULL DEFAULT '{}',
-    PRIMARY KEY (dataset_id, question_id),
-    FOREIGN KEY (dataset_id) REFERENCES datasets(dataset_id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS answers (
-    dataset_id TEXT NOT NULL,
-    answer_id TEXT NOT NULL,
-    question_id TEXT NOT NULL,
-    product_code TEXT,
-    product_name TEXT,
-    model TEXT NOT NULL,
-    model_name TEXT,
-    search_enabled INTEGER NOT NULL DEFAULT 0,
-    round INTEGER NOT NULL,
-    timestamp TEXT,
-    answer_text TEXT NOT NULL,
-    answer_chars INTEGER,
-    latency_ms REAL,
-    source_count INTEGER NOT NULL DEFAULT 0,
-    raw_path TEXT,
-    metadata_json TEXT NOT NULL DEFAULT '{}',
-    PRIMARY KEY (dataset_id, answer_id),
-    UNIQUE (dataset_id, question_id, model, search_enabled, round),
-    FOREIGN KEY (dataset_id, question_id)
-        REFERENCES questions(dataset_id, question_id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS sources (
-    dataset_id TEXT NOT NULL,
-    answer_id TEXT NOT NULL,
-    source_index INTEGER NOT NULL,
-    title TEXT,
-    url TEXT,
-    domain TEXT,
-    metadata_json TEXT NOT NULL DEFAULT '{}',
-    PRIMARY KEY (dataset_id, answer_id, source_index),
-    FOREIGN KEY (dataset_id, answer_id)
-        REFERENCES answers(dataset_id, answer_id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS import_files (
-    file_id TEXT PRIMARY KEY,
-    dataset_id TEXT NOT NULL,
-    source_path TEXT NOT NULL,
-    file_name TEXT NOT NULL,
-    file_type TEXT NOT NULL,
-    sha256 TEXT,
-    size_bytes INTEGER,
-    modified_at TEXT,
-    imported_at TEXT NOT NULL,
-    metadata_json TEXT NOT NULL DEFAULT '{}',
-    FOREIGN KEY (dataset_id) REFERENCES datasets(dataset_id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS external_tables (
-    table_id TEXT PRIMARY KEY,
-    dataset_id TEXT NOT NULL,
-    file_id TEXT NOT NULL,
-    table_name TEXT NOT NULL,
-    sheet_name TEXT,
-    row_count INTEGER NOT NULL,
-    columns_json TEXT NOT NULL,
-    metadata_json TEXT NOT NULL DEFAULT '{}',
-    FOREIGN KEY (dataset_id) REFERENCES datasets(dataset_id) ON DELETE CASCADE,
-    FOREIGN KEY (file_id) REFERENCES import_files(file_id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS external_rows (
-    table_id TEXT NOT NULL,
-    row_index INTEGER NOT NULL,
-    row_json TEXT NOT NULL,
-    PRIMARY KEY (table_id, row_index),
-    FOREIGN KEY (table_id) REFERENCES external_tables(table_id) ON DELETE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS idx_answers_dataset_product
-    ON answers(dataset_id, product_code, model, search_enabled);
-CREATE INDEX IF NOT EXISTS idx_answers_question
-    ON answers(dataset_id, question_id);
-CREATE INDEX IF NOT EXISTS idx_sources_domain
-    ON sources(dataset_id, domain);
-CREATE INDEX IF NOT EXISTS idx_external_tables_dataset
-    ON external_tables(dataset_id, table_name);
-"""
 
 
 def now_iso() -> str:
@@ -251,8 +134,7 @@ def connect(db_path: Path) -> sqlite3.Connection:
 
 
 def init_db(conn: sqlite3.Connection) -> None:
-    conn.executescript(SCHEMA)
-    conn.commit()
+    ensure_schema(conn)
 
 
 def reset_dataset(conn: sqlite3.Connection, dataset_id: str) -> None:
@@ -269,15 +151,19 @@ def upsert_dataset(
     source_path: str,
     metadata: dict[str, Any] | None = None,
     owner: str | None = None,
+    product_code: str | None = None,
+    batch_date: str | None = None,
+    question_set_id: str | None = None,
 ) -> None:
-    ensure_owner_column(conn)
+    ensure_schema(conn)
     conn.execute(
         """
         INSERT INTO datasets (
             dataset_id, name, description, source_type, source_path,
-            created_at, imported_at, metadata_json, owner_username
+            created_at, imported_at, metadata_json, owner_username,
+            product_code, batch_date, question_set_id
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(dataset_id) DO UPDATE SET
             name = excluded.name,
             description = excluded.description,
@@ -285,7 +171,10 @@ def upsert_dataset(
             source_path = excluded.source_path,
             imported_at = excluded.imported_at,
             metadata_json = excluded.metadata_json,
-            owner_username = COALESCE(excluded.owner_username, datasets.owner_username)
+            owner_username = COALESCE(excluded.owner_username, datasets.owner_username),
+            product_code = COALESCE(excluded.product_code, datasets.product_code),
+            batch_date = COALESCE(excluded.batch_date, datasets.batch_date),
+            question_set_id = COALESCE(excluded.question_set_id, datasets.question_set_id)
         """,
         (
             dataset_id,
@@ -297,27 +186,23 @@ def upsert_dataset(
             now_iso(),
             json_dumps(metadata or {}),
             owner,
+            product_code,
+            batch_date,
+            question_set_id,
         ),
     )
 
 
-def ensure_owner_column(conn: sqlite3.Connection) -> None:
-    columns = {row[1] for row in conn.execute("PRAGMA table_info(datasets)")}
-    if "owner_username" not in columns:
-        conn.execute("ALTER TABLE datasets ADD COLUMN owner_username TEXT")
-
-
 def upsert_product(conn: sqlite3.Connection, product_code: str, product_name: str, metadata: dict[str, Any] | None = None) -> None:
+    # 产品主数据由 backend/app/services/product_master.py 从 brands.yaml 同步维护，
+    # 导入侧只补缺失行，不覆盖已有的名称/分类/别名。
     if not product_code and not product_name:
         return
     product_code = product_code or stable_hash(product_name, length=10)
     conn.execute(
         """
-        INSERT INTO products (product_code, product_name, metadata_json)
+        INSERT OR IGNORE INTO products (product_code, product_name, metadata_json)
         VALUES (?, ?, ?)
-        ON CONFLICT(product_code) DO UPDATE SET
-            product_name = excluded.product_name,
-            metadata_json = excluded.metadata_json
         """,
         (product_code, product_name or product_code, json_dumps(metadata or {})),
     )
@@ -599,6 +484,9 @@ def import_baseline(args: argparse.Namespace) -> dict[str, Any]:
         str(Path(args.raw_dir).resolve()),
         {"question_files": [args.questions, args.questions_base]},
         owner=getattr(args, "owner", None),
+        product_code=getattr(args, "product_code", None),
+        batch_date=getattr(args, "batch_date", None),
+        question_set_id=getattr(args, "question_set_id", None),
     )
 
     qmap = load_questions_map([Path(args.questions).resolve(), Path(args.questions_base).resolve()])
@@ -815,13 +703,13 @@ def export_dataset_to_raw(args: argparse.Namespace) -> dict[str, Any]:
 
     answer_rows = conn.execute(
         """
-        SELECT answer_id, question_id, question_text, product_name, model, model_name,
-               search_enabled, round, timestamp, answer_text, latency_ms, source_count,
-               metadata_json
-        FROM answers
-        JOIN questions USING (dataset_id, question_id)
-        WHERE answers.dataset_id = ?
-        ORDER BY model, question_id, round, search_enabled
+        SELECT a.answer_id, a.question_id, q.question_text, a.product_name, a.model,
+               a.model_name, a.search_enabled, a.round, a.timestamp, a.answer_text,
+               a.latency_ms, a.source_count, a.metadata_json
+        FROM answers a
+        JOIN questions q ON q.dataset_id = a.dataset_id AND q.question_id = a.question_id
+        WHERE a.dataset_id = ?
+        ORDER BY a.model, a.question_id, a.round, a.search_enabled
         """,
         (args.dataset_id,),
     ).fetchall()
@@ -858,6 +746,514 @@ def export_dataset_to_raw(args: argparse.Namespace) -> dict[str, Any]:
         path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         written += 1
     return {"dataset_id": args.dataset_id, "answers_written": written, "questions_written": len(question_payload), "output_raw_dir": str(output_root)}
+
+
+# ---------------------------------------------------------------------------
+# 物化：把 splits 聚合从"请求时"搬到"入库时"（性能根治 + 趋势/洞察数据源）
+# ---------------------------------------------------------------------------
+
+SEARCH_FLAG = {"是": "1", "否": "0", "1": "1", "0": "0", "True": "1", "False": "0"}
+
+YANG_TABLE_PATTERN = "养胃舒-%汇总统计数据%"
+YANG_BRAND_TERMS = ("养胃舒", "三九养胃舒", "999养胃舒")
+
+
+def _search_flag(value: Any) -> str:
+    text = clean_text(value)
+    return SEARCH_FLAG.get(text, text or "0")
+
+
+def _level_bucket(level: str) -> str:
+    """detail 表的逐题层级归并到 mention_report 的聚合桶（Q1/Q2、Q3/Q4、Q5）。"""
+    text = clean_text(level).lower()
+    if text.startswith(("q1", "q2")):
+        return "Q1/Q2"
+    if text.startswith(("q3", "q4")):
+        return "Q3/Q4"
+    if text.startswith("q5"):
+        return "Q5"
+    return clean_text(level)
+
+
+def _num_or_none(value: Any) -> float | None:
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _fingerprint(texts: list[str]) -> str:
+    joined = "\n".join(sorted(t.strip() for t in texts if t and t.strip()))
+    return hashlib.sha256(joined.encode("utf-8")).hexdigest()[:12]
+
+
+def _ext_table_rows(conn: sqlite3.Connection, dataset_id: str, table_name: str) -> list[dict[str, Any]]:
+    rows = conn.execute(
+        """
+        SELECT er.row_json FROM external_rows er
+        JOIN external_tables et ON et.table_id = er.table_id
+        WHERE et.dataset_id = ? AND et.table_name = ?
+        """,
+        (dataset_id, table_name),
+    ).fetchall()
+    result = []
+    for (row_json,) in rows:
+        payload = json.loads(row_json)
+        result.append({k: (None if isinstance(v, float) and math.isnan(v) else v) for k, v in payload.items()})
+    return result
+
+
+def _avg_or_none(values: list[float]) -> float | None:
+    clean = [v for v in values if v is not None]
+    if not clean:
+        return None
+    return round(sum(clean) / len(clean), 4)
+
+
+def materialize_dataset(conn: sqlite3.Connection, dataset_id: str) -> dict[str, Any]:
+    ensure_schema(conn)
+    exists = conn.execute("SELECT 1 FROM datasets WHERE dataset_id = ?", (dataset_id,)).fetchone()
+    if not exists:
+        raise ValueError(f"dataset not found: {dataset_id}")
+
+    label_rows = conn.execute(
+        "SELECT DISTINCT product_name, product_code FROM questions WHERE dataset_id = ?",
+        (dataset_id,),
+    ).fetchall()
+    label_to_code = {clean_text(name): clean_text(code) for name, code in label_rows if clean_text(name)}
+
+    def pcode(label: Any) -> str:
+        text = clean_text(label)
+        return label_to_code.get(text) or (text and stable_hash(text, length=10)) or "unknown"
+
+    for table in ("metrics_summary", "metrics_recommendation", "metric_evidence", "dataset_products"):
+        conn.execute(f"DELETE FROM {table} WHERE dataset_id = ?", (dataset_id,))
+
+    stats = {"summary": 0, "recommendation": 0, "evidence": 0}
+
+    def insert_summary(**kw: Any) -> None:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO metrics_summary (
+                dataset_id, product_code, stage, question_level, model, search_enabled,
+                total_answers, category_mention_rate, brand_mention_rate, brand_rec_rate,
+                generic_mention_rate, generic_rec_rate, competitor_mention_rate,
+                competitor_rec_rate, first_rate, top3_rate, avg_rank,
+                negative_count, negative_rate, accuracy_rate, wrong_claims, total_claims, extra_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                dataset_id, kw["product_code"], kw["stage"], kw["question_level"], kw["model"],
+                kw["search_enabled"], kw.get("total_answers"), kw.get("category_mention_rate"),
+                kw.get("brand_mention_rate"), kw.get("brand_rec_rate"),
+                kw.get("generic_mention_rate"), kw.get("generic_rec_rate"),
+                kw.get("competitor_mention_rate"), kw.get("competitor_rec_rate"),
+                kw.get("first_rate"), kw.get("top3_rate"), kw.get("avg_rank"),
+                kw.get("negative_count"), kw.get("negative_rate"), kw.get("accuracy_rate"),
+                kw.get("wrong_claims"), kw.get("total_claims"),
+                json_dumps(kw.get("extra") or {}),
+            ),
+        )
+        stats["summary"] += 1
+
+    def insert_rec(**kw: Any) -> None:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO metrics_recommendation (
+                dataset_id, product_code, stage, question_level, model, search_enabled,
+                rank, rec_product, name_type, mention_count, mention_rate,
+                strong_count, strong_rate, moderate_count, negative_count, extra_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                dataset_id, kw["product_code"], kw["stage"], kw.get("question_level", ""),
+                kw["model"], kw["search_enabled"], kw.get("rank"), kw["rec_product"],
+                kw.get("name_type", ""), kw.get("mention_count"), kw.get("mention_rate"),
+                kw.get("strong_count"), kw.get("strong_rate"), kw.get("moderate_count"),
+                kw.get("negative_count"), json_dumps(kw.get("extra") or {}),
+            ),
+        )
+        stats["recommendation"] += 1
+
+    def insert_evidence(**kw: Any) -> None:
+        conn.execute(
+            """
+            INSERT INTO metric_evidence (
+                dataset_id, evidence_type, product_code, stage, question_level, question_id,
+                model, search_enabled, round, rec_product, name_type, rank,
+                strength, verdict, detail, payload_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                dataset_id, kw["evidence_type"], kw.get("product_code"), kw.get("stage"),
+                kw.get("question_level", ""), kw.get("question_id", ""), kw.get("model", ""),
+                kw.get("search_enabled"), kw.get("round"), kw.get("rec_product"),
+                kw.get("name_type"), kw.get("rank"), kw.get("strength"), kw.get("verdict"),
+                kw.get("detail"), json_dumps(kw.get("payload") or {}),
+            ),
+        )
+        stats["evidence"] += 1
+
+    # ---- 1) mention_report → metrics_summary（提及/推荐率主指标） ----
+    # 负面口径：negative_count/rate = 对"我方品牌"的负面定性（品牌健康的核心问题）；
+    # 全部产品的负面提及数（含竞品被警告）保留在 extra_json 供参考。
+    for row in _ext_table_rows(conn, dataset_id, "mention_report"):
+        label = clean_text(row.get("产品"))
+        level = clean_text(row.get("问题层级"))
+        total = safe_int(row.get("总回答数"))
+        own_negative = (
+            safe_int(row.get("999品牌负面提及数"))
+            if row.get("999品牌负面提及数") is not None
+            else None
+        )
+        insert_summary(
+            product_code=pcode(label),
+            stage=stage_for_level(level),
+            question_level=level,
+            model=clean_text(row.get("模型")),
+            search_enabled=_search_flag(row.get("联网")),
+            total_answers=total,
+            category_mention_rate=_num_or_none(row.get("品类提及率")),
+            brand_mention_rate=_num_or_none(row.get("999品牌提及率")),
+            brand_rec_rate=_num_or_none(row.get("999品牌推荐率")),
+            generic_mention_rate=_num_or_none(row.get("通用名提及率")),
+            generic_rec_rate=_num_or_none(row.get("通用名推荐率")),
+            competitor_mention_rate=_num_or_none(row.get("竞品品牌提及率")),
+            competitor_rec_rate=_num_or_none(row.get("竞品品牌推荐率")),
+            negative_count=own_negative,
+            negative_rate=round(own_negative / total, 4) if (own_negative is not None and total) else None,
+            extra={
+                "_source": "mention",
+                "label": label,
+                "999品牌提及次数": row.get("999品牌提及次数"),
+                "通用名提及次数": row.get("通用名提及次数"),
+                "竞品品牌提及次数": row.get("竞品品牌提及次数"),
+                "成分品类级提及次数": row.get("成分品类级提及次数"),
+                "负面提及数_全部产品": row.get("负面提及数"),
+                "负面提及率_全部产品": row.get("负面提及率"),
+            },
+        )
+
+    # ---- 2) accuracy_detail → 品牌阶段准确率（聚合）+ 逐条证据 ----
+    acc_agg: dict[tuple[str, str, str, str], dict[str, int]] = {}
+    for row in _ext_table_rows(conn, dataset_id, "accuracy_detail"):
+        if row.get("问题ID") is None or row.get("准确率") is None:
+            continue  # 旧格式或空行
+        label = clean_text(row.get("产品"))
+        level = clean_text(row.get("问题类型"))
+        model = clean_text(row.get("模型"))
+        sea = _search_flag(row.get("联网"))
+        key = (label, level, model, sea)
+        agg = acc_agg.setdefault(key, {"correct": 0, "wrong": 0, "claims": 0})
+        correct, wrong = safe_int(row.get("正确")), safe_int(row.get("错误"))
+        agg["correct"] += correct
+        agg["wrong"] += wrong
+        agg["claims"] += safe_int(row.get("知识点数"))
+        insert_evidence(
+            evidence_type="accuracy",
+            product_code=pcode(label),
+            stage=stage_for_level(level),
+            question_level=level,
+            question_id=clean_text(row.get("问题ID")),
+            model=model,
+            search_enabled=1 if sea == "1" else 0,
+            round=safe_int(row.get("轮次"), 1),
+            verdict="wrong" if wrong > 0 else ("correct" if correct > 0 else "unverified"),
+            detail=clean_text(row.get("错误摘要")),
+            payload={
+                "知识点数": row.get("知识点数"), "正确": correct, "错误": wrong,
+                "无依据": row.get("无依据"), "准确率": row.get("准确率"),
+            },
+        )
+    for (label, level, model, sea), agg in acc_agg.items():
+        denom = agg["correct"] + agg["wrong"]
+        insert_summary(
+            product_code=pcode(label),
+            stage=stage_for_level(level),
+            question_level=level,
+            model=model,
+            search_enabled=sea,
+            accuracy_rate=round(agg["correct"] / denom, 4) if denom else None,
+            wrong_claims=agg["wrong"],
+            total_claims=agg["claims"],
+            extra={"_source": "accuracy", "label": label},
+        )
+
+    # ---- 3) rec_overview → 竞品推荐排行 ----
+    for row in _ext_table_rows(conn, dataset_id, "rec_overview"):
+        label = clean_text(row.get("产品"))
+        insert_rec(
+            product_code=pcode(label),
+            stage="all",
+            question_level="",
+            model=clean_text(row.get("模型")),
+            search_enabled=_search_flag(row.get("联网")),
+            rank=safe_int(row.get("排名")) or None,
+            rec_product=clean_text(row.get("被推荐产品")),
+            name_type=clean_text(row.get("名称类型")),
+            mention_count=_num_or_none(row.get("提及次数")),
+            mention_rate=_num_or_none(row.get("提及率")),
+            strong_count=_num_or_none(row.get("强推荐次数")),
+            strong_rate=_num_or_none(row.get("强推荐率")),
+            extra={"label": label, "应答总数": row.get("应答总数"), "可选次数": row.get("可选次数")},
+        )
+
+    # ---- 4) brand_generic_detail → 推荐证据链 + 负面证据/计数 ----
+    neg_agg: dict[tuple[str, str, str, str], int] = {}
+    detail_has_sentiment = False
+    for row in _ext_table_rows(conn, dataset_id, "brand_generic_detail"):
+        label = clean_text(row.get("产品"))
+        level = clean_text(row.get("问题层级"))
+        model = clean_text(row.get("模型"))
+        sea = _search_flag(row.get("联网"))
+        sentiment = clean_text(row.get("情感")).lower()
+        if sentiment:
+            detail_has_sentiment = True
+        is_negative = sentiment in {"negative", "负面"}
+        common = dict(
+            product_code=pcode(label),
+            stage=stage_for_level(level),
+            question_level=level,
+            question_id=clean_text(row.get("问题ID")),
+            model=model,
+            search_enabled=1 if sea == "1" else 0,
+            round=safe_int(row.get("轮次"), 1),
+            rec_product=clean_text(row.get("推荐产品")),
+            name_type=clean_text(row.get("名称类型")),
+            rank=safe_int(row.get("推荐排名")) or None,
+            strength=clean_text(row.get("推荐强度")),
+            detail=clean_text(row.get("推荐原因")),
+            payload={"label": label, "是否推荐": row.get("是否推荐"), "情感": sentiment or None},
+        )
+        insert_evidence(evidence_type="recommendation", **common)
+        if is_negative:
+            insert_evidence(evidence_type="negative", **common)
+            # 汇总口径只统计我方品牌的负面（与 mention_report 的 999品牌负面提及数一致）
+            if common["name_type"] == "999品牌":
+                neg_agg[(label, _level_bucket(level), model, sea)] = (
+                    neg_agg.get((label, _level_bucket(level), model, sea), 0) + 1
+                )
+    # mention_report 没带负面列时（老版 05 输出），从 detail 聚合回填
+    if detail_has_sentiment:
+        for (label, bucket, model, sea), count in neg_agg.items():
+            conn.execute(
+                """
+                UPDATE metrics_summary
+                SET negative_count = ?,
+                    negative_rate = CASE WHEN COALESCE(total_answers, 0) > 0
+                                         THEN ROUND(? * 1.0 / total_answers, 4) END
+                WHERE dataset_id = ? AND product_code = ? AND question_level = ?
+                  AND model = ? AND search_enabled = ? AND negative_count IS NULL
+                """,
+                (count, count, dataset_id, pcode(label), bucket, model, sea),
+            )
+
+    # ---- 5) recommendation_detail → 品类推荐结构 + 品类证据 ----
+    cat_agg: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+    for row in _ext_table_rows(conn, dataset_id, "recommendation_detail"):
+        label = clean_text(row.get("产品"))
+        category = clean_text(row.get("品类"))
+        model = clean_text(row.get("模型"))
+        sea = _search_flag(row.get("联网"))
+        strength = clean_text(row.get("推荐强度"))
+        if category:
+            item = cat_agg.setdefault(
+                (label, model, sea, category), {"count": 0, "strong": 0}
+            )
+            item["count"] += 1
+            if strength == "strong":
+                item["strong"] += 1
+        insert_evidence(
+            evidence_type="category",
+            product_code=pcode(label),
+            stage=stage_for_level(""),
+            question_level="",
+            question_id=clean_text(row.get("问题ID")),
+            model=model,
+            search_enabled=1 if sea == "1" else 0,
+            round=safe_int(row.get("轮次"), 1),
+            rec_product=clean_text(row.get("推荐产品")),
+            rank=safe_int(row.get("推荐排名")) or None,
+            strength=strength,
+            detail=clean_text(row.get("推荐理由")),
+            payload={"label": label, "品类": category},
+        )
+    for (label, model, sea, category), item in cat_agg.items():
+        insert_rec(
+            product_code=pcode(label),
+            stage="category",
+            question_level="品类",
+            model=model,
+            search_enabled=sea,
+            rec_product=category,
+            name_type="品类",
+            mention_count=item["count"],
+            strong_count=item["strong"],
+            extra={"label": label},
+        )
+
+    # ---- 6) 养胃舒专项（厂商预聚合 Excel，无逐题证据，联网维度为 agg） ----
+    yang_rows = conn.execute(
+        """
+        SELECT et.table_name, er.row_json
+        FROM external_rows er
+        JOIN external_tables et ON et.table_id = er.table_id
+        WHERE et.dataset_id = ? AND et.table_name LIKE ? AND et.sheet_name <> '字段说明'
+        """,
+        (dataset_id, YANG_TABLE_PATTERN),
+    ).fetchall()
+    yang_agg: dict[tuple[str, str, str], dict[str, Any]] = {}
+    yang_evidence_count = 0
+    for table_name, row_json in yang_rows:
+        payload = json.loads(row_json)
+        payload = {k: (None if isinstance(v, float) and math.isnan(v) else v) for k, v in payload.items()}
+        if not ("提问词" in payload and "AI模型" in payload and "目标品牌" in payload):
+            continue
+        source_level = table_name.replace("养胃舒-", "").split("汇总统计数据")[0]
+        model = clean_text(payload.get("AI模型"))
+        brand = clean_text(payload.get("目标品牌"))
+        item = yang_agg.setdefault(
+            (source_level, model, brand),
+            {"count": 0, "visibility": [], "top3": [], "first": [], "rank": []},
+        )
+        item["count"] += 1
+        item["visibility"].append(_num_or_none(payload.get("能见度")) or 0.0)
+        if payload.get("前三率") is not None:
+            item["top3"].append(_num_or_none(payload.get("前三率")))
+        if payload.get("首位率") is not None:
+            item["first"].append(_num_or_none(payload.get("首位率")))
+        rank_val = _num_or_none(payload.get("位次"))
+        if rank_val and rank_val > 0:
+            item["rank"].append(rank_val)
+        insert_evidence(
+            evidence_type="yang_metric",
+            product_code="weitai",
+            stage=stage_for_level(source_level),
+            question_level=source_level,
+            question_id="",
+            model=model,
+            rec_product=brand,
+            name_type="目标品牌",
+            detail=clean_text(payload.get("提问词")),
+            payload={
+                "能见度": payload.get("能见度"), "位次": payload.get("位次"),
+                "前三率": payload.get("前三率"), "首位率": payload.get("首位率"),
+                "轮数": payload.get("轮数"),
+            },
+        )
+        yang_evidence_count += 1
+
+    yang_groups: dict[tuple[str, str], list[tuple[str, dict[str, Any]]]] = {}
+    for (source_level, model, brand), item in yang_agg.items():
+        yang_groups.setdefault((source_level, model), []).append((brand, item))
+    for (source_level, model), items in yang_groups.items():
+        ranked = sorted(
+            items,
+            key=lambda pair: (
+                _avg_or_none(pair[1]["visibility"]) or 0,
+                _avg_or_none(pair[1]["top3"]) or 0,
+                _avg_or_none(pair[1]["first"]) or 0,
+            ),
+            reverse=True,
+        )
+        for index, (brand, item) in enumerate(ranked, start=1):
+            visibility = _avg_or_none(item["visibility"])
+            top3 = _avg_or_none(item["top3"])
+            first = _avg_or_none(item["first"])
+            avg_rank = _avg_or_none(item["rank"])
+            mention_count = round((visibility or 0) * item["count"], 2)
+            strong_count = min(round((top3 or 0) * item["count"], 2), mention_count)
+            insert_rec(
+                product_code="weitai",
+                stage=stage_for_level(source_level),
+                question_level=source_level,
+                model=model,
+                search_enabled="agg",
+                rank=index,
+                rec_product=brand,
+                name_type="目标品牌",
+                mention_count=mention_count,
+                mention_rate=visibility,
+                strong_count=strong_count,
+                strong_rate=top3,
+                extra={"平均首位率": first, "平均位次": avg_rank, "样本数": item["count"]},
+            )
+            if any(term in brand for term in YANG_BRAND_TERMS):
+                insert_summary(
+                    product_code="weitai",
+                    stage=stage_for_level(source_level),
+                    question_level=source_level,
+                    model=model,
+                    search_enabled="agg",
+                    total_answers=item["count"],
+                    brand_mention_rate=visibility,
+                    first_rate=first,
+                    top3_rate=top3,
+                    avg_rank=avg_rank,
+                    extra={"_source": "yang", "label": "养胃舒专项", "目标品牌": brand},
+                )
+
+    # ---- 7) 批次归属：dataset_products + 问题集指纹 + 批次日期 ----
+    q_rows = conn.execute(
+        "SELECT product_code, product_name, question_text FROM questions WHERE dataset_id = ?",
+        (dataset_id,),
+    ).fetchall()
+    per_product: dict[str, dict[str, Any]] = {}
+    all_texts: list[str] = []
+    for code, name, text in q_rows:
+        code = clean_text(code) or "unknown"
+        item = per_product.setdefault(code, {"name": clean_text(name), "texts": []})
+        item["texts"].append(clean_text(text))
+        all_texts.append(clean_text(text))
+    for code, item in per_product.items():
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO dataset_products (
+                dataset_id, product_code, product_name, question_set_id, question_count
+            ) VALUES (?, ?, ?, ?, ?)
+            """,
+            (dataset_id, code, item["name"], _fingerprint(item["texts"]), len(item["texts"])),
+        )
+    batch_match = re.search(r"_(\d{8})$", dataset_id)
+    batch_date = None
+    if batch_match:
+        raw = batch_match.group(1)
+        batch_date = f"{raw[:4]}-{raw[4:6]}-{raw[6:]}"
+    conn.execute(
+        """
+        UPDATE datasets
+        SET question_set_id = ?,
+            batch_date = COALESCE(batch_date, ?),
+            product_code = COALESCE(product_code, ?)
+        WHERE dataset_id = ?
+        """,
+        (
+            _fingerprint(all_texts) if all_texts else None,
+            batch_date,
+            list(per_product)[0] if len(per_product) == 1 else None,
+            dataset_id,
+        ),
+    )
+
+    conn.commit()
+    stats["dataset_products"] = len(per_product)
+    stats["yang_evidence"] = yang_evidence_count
+    return stats
+
+
+def materialize(args: argparse.Namespace) -> dict[str, Any]:
+    conn = connect(Path(args.db).resolve())
+    init_db(conn)
+    if args.dataset_id == "all":
+        ids = [row[0] for row in conn.execute("SELECT dataset_id FROM datasets ORDER BY dataset_id")]
+    else:
+        ids = [args.dataset_id]
+    results = {}
+    for dataset_id in ids:
+        results[dataset_id] = materialize_dataset(conn, dataset_id)
+    return results
 
 
 def summarize(args: argparse.Namespace) -> dict[str, Any]:
@@ -927,6 +1323,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--questions", default=str(BASE_DIR / "questions" / "questions_expanded.json"))
     p.add_argument("--questions-base", default=str(BASE_DIR / "questions" / "questions_base.json"))
     p.add_argument("--owner", default=None, help="Owner username for this dataset (user-scoped access).")
+    p.add_argument("--product-code", default=None, help="Primary product code for this batch (trend anchor).")
+    p.add_argument("--batch-date", default=None, help="Collection batch date YYYY-MM-DD.")
+    p.add_argument("--question-set-id", default=None, help="Question set fingerprint for trend comparability.")
     p.add_argument("--reset", action="store_true", help="Delete and re-import this dataset.")
 
     p = sub.add_parser("import-yangweishu", help="Import the full 三九养胃舒 source folder.")
@@ -949,6 +1348,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--questions-output", required=True)
     p.add_argument("--reset-output", action="store_true")
 
+    p = sub.add_parser("materialize", help="Materialize metrics tables for dashboards/insight APIs.")
+    add_common(p)
+    p.add_argument("--dataset-id", default="all", help="Dataset id, or 'all' for every dataset.")
+
     p = sub.add_parser("summary", help="Print dataset counts.")
     add_common(p)
 
@@ -970,6 +1373,8 @@ def main() -> None:
         result = import_yangweishu(args)
     elif args.command == "export-raw":
         result = export_dataset_to_raw(args)
+    elif args.command == "materialize":
+        result = materialize(args)
     elif args.command == "summary":
         result = summarize(args)
     elif args.command == "import-all":
