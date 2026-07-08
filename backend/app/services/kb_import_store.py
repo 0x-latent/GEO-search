@@ -19,6 +19,7 @@ import queue
 import re
 import sqlite3
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
@@ -380,16 +381,24 @@ def _recognize_page(client, model: str, page: dict[str, Any], checkpoint: Path) 
             "text": f"这是一页 PPT。文本框内容如下：\n{slide_text}\n\n"
                     f"请结合上面的图片，把这页 PPT 的全部信息转录为 Markdown。只输出转录内容。",
         })
-    response = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": content}],
-        temperature=0,
-        max_tokens=3000,
-    )
-    text = response.choices[0].message.content or ""
-    checkpoint.parent.mkdir(parents=True, exist_ok=True)
-    checkpoint.write_text(text, encoding="utf-8")
-    return text
+    # 中继被分析任务打满时视觉调用会超时——指数退避重试，最后一次失败才抛
+    last_error: Exception | None = None
+    for attempt in range(4):
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": content}],
+                temperature=0,
+                max_tokens=3000,
+            )
+            text = response.choices[0].message.content or ""
+            checkpoint.parent.mkdir(parents=True, exist_ok=True)
+            checkpoint.write_text(text, encoding="utf-8")
+            return text
+        except Exception as exc:  # noqa: BLE001
+            last_error = exc
+            time.sleep(10 * (attempt + 1))
+    raise RuntimeError(f"页面识别失败（重试 4 次）: {last_error}")
 
 
 def _parse_json_object(text: str) -> dict[str, Any]:
