@@ -198,6 +198,19 @@ def create_import(
     return get_import(import_id)
 
 
+def retry_import(import_id: str) -> dict[str, Any]:
+    """失败任务重试：已识别页面有磁盘断点，只补剩余部分。"""
+    record = get_import(import_id)
+    if record is None:
+        raise ValueError("导入任务不存在")
+    if record["status"] != "failed":
+        raise ValueError(f"当前状态不能重试：{record['status']}")
+    _update(import_id, status="queued", error=None, finished_at=None)
+    ensure_worker()
+    _QUEUE.put(import_id)
+    return get_import(import_id)
+
+
 def ensure_worker() -> None:
     global _WORKER_STARTED
     with _WORKER_LOCK:
@@ -263,8 +276,13 @@ def _vision_model() -> str:
 # ---------------------------------------------------------------------------
 
 
-def _render_pages(path: Path, ext: str) -> list[dict[str, Any]]:
-    """返回页面负载列表：{"kind": "image", "b64": ..., "mime": ...} 或 {"kind": "text", "text": ...}"""
+def _render_pages(path: Path, ext: str, pages_dir: Path) -> list[dict[str, Any]]:
+    """文件 → 页面描述符列表。
+
+    内存纪律（1.6GB 小内存服务器的教训）：页面图一律落盘到 pages_dir，
+    描述符只存文件路径；识别时逐页读入→调用→释放，任何时刻内存里
+    最多只有"并发数"张图。
+    """
     if ext in (".txt", ".md"):
         raw = path.read_bytes()
         for encoding in ("utf-8-sig", "utf-8", "gbk"):
@@ -274,9 +292,11 @@ def _render_pages(path: Path, ext: str) -> list[dict[str, Any]]:
                 continue
         return [{"kind": "text", "text": raw.decode("utf-8", errors="replace")}]
 
+    pages_dir.mkdir(parents=True, exist_ok=True)
+
     if ext in (".png", ".jpg", ".jpeg", ".webp"):
         mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp"}[ext[1:]]
-        return [{"kind": "image", "b64": base64.b64encode(path.read_bytes()).decode(), "mime": mime}]
+        return [{"kind": "image", "path": str(path), "mime": mime}]
 
     if ext == ".pdf":
         import fitz
@@ -285,13 +305,13 @@ def _render_pages(path: Path, ext: str) -> list[dict[str, Any]]:
         with fitz.open(path) as doc:
             if doc.page_count > MAX_PAGES:
                 raise ValueError(f"PDF 共 {doc.page_count} 页，超过 {MAX_PAGES} 页上限，请拆分后上传")
-            for page in doc:
-                pix = page.get_pixmap(dpi=140)
-                pages.append({
-                    "kind": "image",
-                    "b64": base64.b64encode(pix.tobytes("png")).decode(),
-                    "mime": "image/png",
-                })
+            for index, page in enumerate(doc):
+                image_path = pages_dir / f"page_{index:03d}.jpg"
+                if not image_path.exists():
+                    pix = page.get_pixmap(dpi=120)
+                    image_path.write_bytes(pix.tobytes("jpeg"))
+                    del pix
+                pages.append({"kind": "image", "path": str(image_path), "mime": "image/jpeg"})
         return pages
 
     if ext == ".pptx":
@@ -301,21 +321,24 @@ def _render_pages(path: Path, ext: str) -> list[dict[str, Any]]:
         if len(prs.slides) > MAX_PAGES:
             raise ValueError(f"PPT 共 {len(prs.slides)} 页，超过 {MAX_PAGES} 页上限，请拆分后上传")
         pages = []
-        for slide in prs.slides:
+        for slide_index, slide in enumerate(prs.slides):
             texts = []
             images = []
-            for shape in slide.shapes:
+            for shape_index, shape in enumerate(slide.shapes):
                 if shape.has_text_frame and shape.text_frame.text.strip():
                     texts.append(shape.text_frame.text.strip())
                 if shape.shape_type == 13 and getattr(shape, "image", None):  # PICTURE
                     blob = shape.image.blob
-                    if blob and len(blob) < 5 * 1024 * 1024:
+                    if blob and len(blob) < 5 * 1024 * 1024 and len(images) < 3:
+                        suffix = (shape.image.ext or "png").lstrip(".")
+                        image_path = pages_dir / f"slide_{slide_index:03d}_{shape_index}.{suffix}"
+                        if not image_path.exists():
+                            image_path.write_bytes(blob)
                         images.append({
-                            "b64": base64.b64encode(blob).decode(),
+                            "path": str(image_path),
                             "mime": shape.image.content_type or "image/png",
                         })
-            page: dict[str, Any] = {"kind": "slide", "text": "\n".join(texts), "images": images[:3]}
-            pages.append(page)
+            pages.append({"kind": "slide", "text": "\n".join(texts), "images": images})
         return pages
 
     raise ValueError(f"未实现的类型: {ext}")
@@ -326,38 +349,47 @@ def _render_pages(path: Path, ext: str) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 
-def _recognize_page(client, model: str, page: dict[str, Any]) -> str:
+def _file_b64(path: str) -> str:
+    return base64.b64encode(Path(path).read_bytes()).decode()
+
+
+def _recognize_page(client, model: str, page: dict[str, Any], checkpoint: Path) -> str:
+    """识别单页。结果落盘 checkpoint（页级断点），重试/重启不重复调用。"""
     if page["kind"] == "text":
         return page["text"]
+    if checkpoint.exists():
+        return checkpoint.read_text(encoding="utf-8")
     content: list[dict[str, Any]] = []
     if page["kind"] == "image":
         content.append({
             "type": "image_url",
-            "image_url": {"url": f"data:{page['mime']};base64,{page['b64']}"},
+            "image_url": {"url": f"data:{page['mime']};base64,{_file_b64(page['path'])}"},
         })
         content.append({"type": "text", "text": RECOGNIZE_PROMPT})
     else:  # slide：文本 + 内嵌图片一起识别
         for image in page.get("images", []):
             content.append({
                 "type": "image_url",
-                "image_url": {"url": f"data:{image['mime']};base64,{image['b64']}"},
+                "image_url": {"url": f"data:{image['mime']};base64,{_file_b64(image['path'])}"},
             })
         slide_text = page.get("text", "")
-        if page.get("images"):
-            content.append({
-                "type": "text",
-                "text": f"这是一页 PPT。文本框内容如下：\n{slide_text}\n\n"
-                        f"请结合上面的图片，把这页 PPT 的全部信息转录为 Markdown。只输出转录内容。",
-            })
-        else:
+        if not page.get("images"):
             return slide_text
+        content.append({
+            "type": "text",
+            "text": f"这是一页 PPT。文本框内容如下：\n{slide_text}\n\n"
+                    f"请结合上面的图片，把这页 PPT 的全部信息转录为 Markdown。只输出转录内容。",
+        })
     response = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": content}],
         temperature=0,
         max_tokens=3000,
     )
-    return response.choices[0].message.content or ""
+    text = response.choices[0].message.content or ""
+    checkpoint.parent.mkdir(parents=True, exist_ok=True)
+    checkpoint.write_text(text, encoding="utf-8")
+    return text
 
 
 def _parse_json_object(text: str) -> dict[str, Any]:
@@ -426,24 +458,25 @@ def _run_import(import_id: str) -> None:
         raise RuntimeError("源文件丢失")
     _update(import_id, status="running", stage="render", error=None)
 
-    pages = _render_pages(source_path, record["file_ext"])
-    _update(import_id, page_count=len(pages), stage="recognize")
+    pages_dir = workdir / "pages"
+    pages = _render_pages(source_path, record["file_ext"], pages_dir)
+    _update(import_id, page_count=len(pages), stage="recognize", pages_done=0)
 
     client, route = _vision_client()
     model = _vision_model()
     done_lock = threading.Lock()
     done = {"n": 0}
 
-    def _do(page: dict[str, Any]) -> str:
-        text = _recognize_page(client, model, page)
+    def _do(indexed: tuple[int, dict[str, Any]]) -> str:
+        index, page = indexed
+        text = _recognize_page(client, model, page, pages_dir / f"text_{index:03d}.md")
         with done_lock:
             done["n"] += 1
             _update(import_id, pages_done=done["n"])
         return text
 
-    needs_llm = [p for p in pages if p["kind"] != "text" and not (p["kind"] == "slide" and not p.get("images"))]
     with ThreadPoolExecutor(max_workers=RECOGNIZE_CONCURRENCY) as pool:
-        page_texts = list(pool.map(_do, pages))
+        page_texts = list(pool.map(_do, enumerate(pages)))
     source_text = "\n\n---\n\n".join(t for t in page_texts if t and t.strip())
     if len(source_text.strip()) < 20:
         raise RuntimeError("识别结果几乎为空，请检查文件内容是否清晰")

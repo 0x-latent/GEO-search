@@ -83,6 +83,16 @@ async function submit() {
   }
 }
 
+async function retryImport(row) {
+  try {
+    await api(`/api/kb-imports/${encodeURIComponent(row.import_id)}/retry`, { method: "POST" });
+    ElMessage.success("已重新入队（已识别的页面不会重复调用）");
+    await loadImports();
+  } catch (error) {
+    ElMessage.error(`重试失败：${error.message}`);
+  }
+}
+
 // ---------- 审核 ----------
 const review = reactive({
   visible: false,
@@ -199,7 +209,7 @@ async function applyReview() {
         </template>
       </el-table-column>
       <el-table-column prop="created_at" label="时间" width="150" />
-      <el-table-column label="操作" width="100">
+      <el-table-column label="操作" width="110">
         <template #default="{ row }">
           <el-button
             v-if="row.status === 'success'"
@@ -209,6 +219,15 @@ async function applyReview() {
             @click="openReview(row)"
           >
             {{ row.applied_at ? "再次审核" : "审核合并" }}
+          </el-button>
+          <el-button
+            v-if="row.status === 'failed'"
+            link
+            type="primary"
+            size="small"
+            @click="retryImport(row)"
+          >
+            断点重试
           </el-button>
         </template>
       </el-table-column>

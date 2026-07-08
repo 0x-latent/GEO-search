@@ -62,6 +62,16 @@ def get_kb_import(import_id: str, request: Request) -> dict[str, Any]:
     return record
 
 
+@router.post("/{import_id}/retry")
+def retry_kb_import(import_id: str, request: Request) -> dict[str, Any]:
+    """失败任务断点重试（已识别页面不重复调用）。"""
+    _owned(import_id, request)
+    try:
+        return kb_import_store.retry_import(import_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 class ApplyPayload(BaseModel):
     modules: dict[str, str]
     scope: str | None = None
