@@ -354,6 +354,18 @@ def _file_b64(path: str) -> str:
     return base64.b64encode(Path(path).read_bytes()).decode()
 
 
+def _chat_with_retry(client, attempts: int = 4, **kwargs):
+    """统一的对话调用重试：中继被采集任务打满时超时/限流，指数退避。"""
+    last_error: Exception | None = None
+    for attempt in range(attempts):
+        try:
+            return client.chat.completions.create(**kwargs)
+        except Exception as exc:  # noqa: BLE001
+            last_error = exc
+            time.sleep(15 * (attempt + 1))
+    raise RuntimeError(f"模型调用失败（重试 {attempts} 次）: {last_error}")
+
+
 def _recognize_page(client, model: str, page: dict[str, Any], checkpoint: Path) -> str:
     """识别单页。结果落盘 checkpoint（页级断点），重试/重启不重复调用。"""
     if page["kind"] == "text":
@@ -381,24 +393,17 @@ def _recognize_page(client, model: str, page: dict[str, Any], checkpoint: Path) 
             "text": f"这是一页 PPT。文本框内容如下：\n{slide_text}\n\n"
                     f"请结合上面的图片，把这页 PPT 的全部信息转录为 Markdown。只输出转录内容。",
         })
-    # 中继被分析任务打满时视觉调用会超时——指数退避重试，最后一次失败才抛
-    last_error: Exception | None = None
-    for attempt in range(4):
-        try:
-            response = client.chat.completions.create(
-                model=model,
-                messages=[{"role": "user", "content": content}],
-                temperature=0,
-                max_tokens=3000,
-            )
-            text = response.choices[0].message.content or ""
-            checkpoint.parent.mkdir(parents=True, exist_ok=True)
-            checkpoint.write_text(text, encoding="utf-8")
-            return text
-        except Exception as exc:  # noqa: BLE001
-            last_error = exc
-            time.sleep(10 * (attempt + 1))
-    raise RuntimeError(f"页面识别失败（重试 4 次）: {last_error}")
+    response = _chat_with_retry(
+        client,
+        model=model,
+        messages=[{"role": "user", "content": content}],
+        temperature=0,
+        max_tokens=3000,
+    )
+    text = response.choices[0].message.content or ""
+    checkpoint.parent.mkdir(parents=True, exist_ok=True)
+    checkpoint.write_text(text, encoding="utf-8")
+    return text
 
 
 def _parse_json_object(text: str) -> dict[str, Any]:
@@ -413,7 +418,8 @@ def _extract_modules(client, model: str, product: str, source: str) -> dict[str,
     catalog = "\n".join(f"- {mid}: {name}" for mid, name in MODULE_CATALOG.items())
     # 原文过长时截断（qwen3.7-plus 上下文足够大，此处兜底 8 万字）
     prompt = EXTRACT_PROMPT.format(catalog=catalog, product=product, source=source[:80000])
-    response = client.chat.completions.create(
+    response = _chat_with_retry(
+        client,
         model=model,
         messages=[{"role": "user", "content": prompt}],
         temperature=0,
