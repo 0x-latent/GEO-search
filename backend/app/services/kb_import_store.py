@@ -250,16 +250,19 @@ def _vision_client():
 
     keys = yaml.safe_load((CONFIG_DIR / "api_keys.yaml").read_text(encoding="utf-8")) or {}
     models_cfg = yaml.safe_load((CONFIG_DIR / "models.yaml").read_text(encoding="utf-8")) or {}
+    # 超时按"大调用"设：结构化抽取是 2 万字输入 + 8k token 输出，
+    # 模型空载生成也可能超过 180s——这是超时的主因，不是并发拥堵
+    timeout = int(os.environ.get("GEO_VISION_TIMEOUT", "360") or 360)
     relay = resolve_relay(models_cfg, keys)
     if relay:
-        return OpenAI(base_url=relay["base_url"], api_key=relay["api_key"], timeout=180), "relay"
+        return OpenAI(base_url=relay["base_url"], api_key=relay["api_key"], timeout=timeout), "relay"
     qwen_key = (keys.get("qwen") or {}).get("api_key", "")
     if qwen_key and qwen_key != "sk-xxx":
         return (
             OpenAI(
                 base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
                 api_key=qwen_key,
-                timeout=180,
+                timeout=timeout,
             ),
             "direct",
         )
