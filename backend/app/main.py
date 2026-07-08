@@ -57,16 +57,23 @@ def _portal_user(request: Request) -> dict | None:
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
     if path in PUBLIC_PATHS:
-        return await call_next(request)
-    user = _portal_user(request) or auth_store.get_session_user(
-        request.cookies.get(SESSION_COOKIE)
-    )
-    if user is None:
-        if path.startswith("/api"):
-            return JSONResponse({"detail": "未登录"}, status_code=401)
-        return RedirectResponse("/login.html", status_code=302)
-    request.state.user = user
-    return await call_next(request)
+        response = await call_next(request)
+    else:
+        user = _portal_user(request) or auth_store.get_session_user(
+            request.cookies.get(SESSION_COOKIE)
+        )
+        if user is None:
+            if path.startswith("/api"):
+                return JSONResponse({"detail": "未登录"}, status_code=401)
+            return RedirectResponse("/login.html", status_code=302)
+        request.state.user = user
+        response = await call_next(request)
+    # 缓存策略：入口 HTML 每次协商（发版即生效），带内容哈希的资源长缓存
+    if path.startswith("/assets/"):
+        response.headers.setdefault("Cache-Control", "public, max-age=31536000, immutable")
+    elif not path.startswith("/api"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
 
 
 app.include_router(auth_router)
