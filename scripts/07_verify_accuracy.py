@@ -104,6 +104,13 @@ def build_kb_resolver(kb: dict):
                     if _group_of(candidate) is product_group:
                         key = candidate
                         break
+                # 品牌级知识库桥接：子产品别名里含品牌全名时命中品牌 KB
+                # （如 保湿特润霜 的别名 顺峰宝宝儿童保湿特润霜 ⊃ kb key 顺峰宝宝）
+                if key is None:
+                    for candidate in kb:
+                        if any(candidate in term for term in product_group if term):
+                            key = candidate
+                            break
         cache[product] = key
         return key
 
