@@ -52,26 +52,47 @@ def _existing_products(conn: sqlite3.Connection) -> tuple[dict[str, str], set[st
     return existing, used
 
 
-def _match_code(
+def _match_exact(
     brand_key: str,
     aliases: list[str],
     existing: dict[str, str],
     used: set[str],
     claimed: set[str],
 ) -> str | None:
+    """精确匹配：existing 名与品牌名/别名逐字相等，或命中历史短名对照。"""
+    candidates = {brand_key, *aliases}
+    matched = [
+        code
+        for code, name in existing.items()
+        if code not in claimed and name and (name in candidates or LEGACY_NAME_MAP.get(name) == brand_key)
+    ]
+    if not matched:
+        return None
+    matched.sort(key=lambda code: (code not in used, code))
+    return matched[0]
+
+
+def _match_contains(
+    brand_key: str,
+    aliases: list[str],
+    existing: dict[str, str],
+    used: set[str],
+    claimed: set[str],
+) -> str | None:
+    """包含匹配（兜底）：仅用于把历史短名行迁移到新品牌键。
+
+    注意：品牌名往往是子产品全名的子串（顺峰宝宝 ⊂ 顺峰宝宝儿童保湿特润霜），
+    所以包含匹配必须放在全部精确匹配之后跑，否则会互相抢占 code。
+    """
     candidates = [brand_key, *aliases]
     matched: list[str] = []
     for code, name in existing.items():
         if code in claimed or not name:
             continue
-        if LEGACY_NAME_MAP.get(name) == brand_key:
-            matched.append(code)
-            continue
         if any(name in cand or cand in name for cand in candidates if cand):
             matched.append(code)
     if not matched:
         return None
-    # 同名重复 code（历史脏数据）时，优先选 answers 里真正在用的那个
     matched.sort(key=lambda code: (code not in used, code))
     return matched[0]
 
@@ -86,11 +107,28 @@ def sync_products_from_brands(brands: dict[str, Any] | None = None) -> dict[str,
         ensure_schema(conn)
         existing, used = _existing_products(conn)
         claimed: set[str] = set()
-        synced: list[dict[str, str]] = []
+        assigned: dict[str, str] = {}
+        entries = []
         for order, (brand_key, spec) in enumerate(brand_999.items()):
             spec = spec or {}
             aliases = [str(a) for a in (spec.get("aliases") or [])]
-            code = _match_code(brand_key, aliases, existing, used, claimed)
+            entries.append((order, brand_key, spec, aliases))
+        # 两阶段认领：全部精确匹配先行，包含匹配只处理剩余（防止品牌名抢占子产品 code）
+        for order, brand_key, spec, aliases in entries:
+            code = _match_exact(brand_key, aliases, existing, used, claimed)
+            if code is not None:
+                assigned[brand_key] = code
+                claimed.add(code)
+        for order, brand_key, spec, aliases in entries:
+            if brand_key in assigned:
+                continue
+            code = _match_contains(brand_key, aliases, existing, used, claimed)
+            if code is not None:
+                assigned[brand_key] = code
+                claimed.add(code)
+        synced: list[dict[str, str]] = []
+        for order, brand_key, spec, aliases in entries:
+            code = assigned.get(brand_key)
             if code is None:
                 code = _stable_code(brand_key)
             claimed.add(code)
