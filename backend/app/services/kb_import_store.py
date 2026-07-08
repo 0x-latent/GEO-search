@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import queue
 import re
 import sqlite3
@@ -33,7 +34,8 @@ KB_IMPORTS_DIR = DATA_DIR / "kb_imports"
 
 MAX_FILE_BYTES = 20 * 1024 * 1024
 MAX_PAGES = 40
-RECOGNIZE_CONCURRENCY = 5
+# 页面识别并发（各页独立识别，最后一次合成抽取）
+RECOGNIZE_CONCURRENCY = max(1, min(int(os.environ.get("GEO_VISION_CONCURRENCY", "10") or 10), 20))
 VISION_MODEL_DEFAULT = "qwen3.7-plus"
 
 ALLOWED_EXTS = {".pdf", ".pptx", ".txt", ".md", ".png", ".jpg", ".jpeg", ".webp"}
