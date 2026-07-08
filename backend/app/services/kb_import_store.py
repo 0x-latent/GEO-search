@@ -563,7 +563,10 @@ def apply_import(
     if scope == "global":
         kb = user_config_store.load_global_kb()
     else:
-        kb = user_config_store.load_effective_kb(owner)["data"]
+        # 从该用户"自己的" KB 起步（没有则从空开始）——不能用生效配置，
+        # 否则会把全局默认的其他产品知识库整体复制到该用户名下
+        own_path = user_config_store.user_kb_path(owner)
+        kb = json.loads(own_path.read_text(encoding="utf-8")) if own_path else {}
 
     entry = kb.setdefault(product_key, {"product_name": product_key, "modules": {}})
     entry.setdefault("modules", {})
