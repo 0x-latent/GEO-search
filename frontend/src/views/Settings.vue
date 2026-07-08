@@ -5,6 +5,7 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import { api, apiJson } from "@/api/client";
 import BrandsEditor from "@/components/config/BrandsEditor.vue";
 import KbEditor from "@/components/config/KbEditor.vue";
+import KbImportPanel from "@/components/config/KbImportPanel.vue";
 import { useSessionStore } from "@/stores/session";
 
 const session = useSessionStore();
@@ -160,6 +161,12 @@ function switchScope(value) {
       </el-tab-pane>
 
       <el-tab-pane label="知识库" name="kb">
+        <KbImportPanel
+          v-if="kbData"
+          :kb-data="kbData"
+          :scope="scope === 'mine' ? 'user' : 'global'"
+          @applied="load"
+        />
         <el-card shadow="never">
           <KbEditor v-if="kbData" ref="kbEditor" :data="kbData" />
           <div class="actions">
