@@ -15,11 +15,18 @@ from uuid import uuid4
 
 from ..core.paths import CONFIG_DIR, DATA_DIR, ROOT_DIR, SCRIPTS_DIR
 from .user_config_store import GLOBAL_KB_PATH, user_brands_path, user_kb_path
+from .yaml_store import load_models
 
 JOBS_DB_PATH = DATA_DIR / "jobs.sqlite"
 JOBS_DIR = DATA_DIR / "jobs"
 
 MAX_QUESTIONS = 500
+DEFAULT_CONCURRENCY = 20
+MAX_CONCURRENCY = 50
+
+# 运行中任务的子进程句柄与取消标记（单 worker 线程，dict 足够）
+_RUNNING_PROCS: dict[str, subprocess.Popen] = {}
+_CANCEL_FLAGS: set[str] = set()
 
 # 流水线阶段：(阶段名, 脚本, 失败是否中止整个 job)
 STAGES = [
@@ -70,9 +77,16 @@ def init_db() -> None:
         )
         # 已有库的惰性迁移
         columns = {row[1] for row in conn.execute("PRAGMA table_info(jobs)")}
-        for name in ("product_code", "batch_date"):
+        lazy = {
+            "product_code": "TEXT",
+            "batch_date": "TEXT",
+            "concurrency": "INTEGER",
+            "model_concurrency_json": "TEXT",
+            "total_calls": "INTEGER",
+        }
+        for name, ddl in lazy.items():
             if name not in columns:
-                conn.execute(f"ALTER TABLE jobs ADD COLUMN {name} TEXT")
+                conn.execute(f"ALTER TABLE jobs ADD COLUMN {name} {ddl}")
 
 
 def _now() -> str:
@@ -91,6 +105,25 @@ def get_job(job_id: str) -> dict[str, Any] | None:
     return dict(row) if row else None
 
 
+def collect_progress(job: dict[str, Any]) -> dict[str, Any] | None:
+    """采集阶段进度：execution_log 已完成的唯一任务数 / 预估总调用数。"""
+    total = job.get("total_calls") or 0
+    if not total:
+        return None
+    log_path = JOBS_DIR / job["job_id"] / "execution_log.json"
+    if not log_path.exists():
+        return {"done": 0, "total": total}
+    try:
+        log = json.loads(log_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {"done": 0, "total": total}
+    keys = {
+        (e.get("question_id"), e.get("model"), e.get("search_enabled"), e.get("round"))
+        for e in log.get("executions", [])
+    }
+    return {"done": min(len(keys), total), "total": total}
+
+
 def list_jobs(username: str | None = None) -> list[dict[str, Any]]:
     """username=None 返回全部（admin），否则只返回该用户的。"""
     with _connect() as conn:
@@ -101,7 +134,41 @@ def list_jobs(username: str | None = None) -> list[dict[str, Any]]:
                 "SELECT * FROM jobs WHERE username = ? ORDER BY created_at DESC LIMIT 200",
                 (username,),
             ).fetchall()
-    return [dict(row) for row in rows]
+    jobs = [dict(row) for row in rows]
+    for job in jobs:
+        # 只为进行中的采集任务读日志（避免列表接口扫全部历史文件）
+        if job["status"] == "running" and job.get("stage") == "collect":
+            job["collect_progress"] = collect_progress(job)
+    return jobs
+
+
+def retry_job(job_id: str) -> dict[str, Any]:
+    """失败/已取消任务断点续跑：03/05/07 有各自的断点日志，只补没完成的部分。"""
+    job = get_job(job_id)
+    if job is None:
+        raise ValueError("任务不存在")
+    if job["status"] not in ("failed", "cancelled"):
+        raise ValueError(f"当前状态不能重试：{job['status']}")
+    _CANCEL_FLAGS.discard(job_id)
+    _update_job(job_id, status="queued", error=None, finished_at=None)
+    ensure_worker()
+    _QUEUE.put(job_id)
+    return get_job(job_id)
+
+
+def cancel_job(job_id: str) -> dict[str, Any]:
+    """取消任务：排队中直接标记；执行中终止当前阶段子进程（已完成部分保留，可重试续跑）。"""
+    job = get_job(job_id)
+    if job is None:
+        raise ValueError("任务不存在")
+    if job["status"] not in ("queued", "running"):
+        raise ValueError(f"当前状态不能取消：{job['status']}")
+    _CANCEL_FLAGS.add(job_id)
+    _update_job(job_id, status="cancelled", error="用户取消", finished_at=_now())
+    process = _RUNNING_PROCS.get(job_id)
+    if process is not None and process.poll() is None:
+        process.terminate()
+    return get_job(job_id)
 
 
 def read_job_log(job_id: str) -> str:
@@ -111,6 +178,24 @@ def read_job_log(job_id: str) -> str:
     text = path.read_text(encoding="utf-8", errors="replace")
     # 只回传末尾 200KB，避免大日志拖垮页面
     return text[-200_000:]
+
+
+def _estimate_total_calls(
+    questions_count: int, models: list[str], search_mode: str, rounds: int
+) -> int:
+    """采集阶段总调用数（进度分母）。按各模型是否支持联网精确计算。"""
+    config = load_models()
+    specs = config.get("models") or {}
+    per_question = 0
+    for key in models:
+        supports_search = (specs.get(key) or {}).get("supports_search", False)
+        if search_mode == "both":
+            per_question += 2 if supports_search else 1
+        elif search_mode == "search":
+            per_question += 1 if supports_search else 0
+        else:
+            per_question += 1
+    return questions_count * per_question * rounds
 
 
 def create_job(
@@ -125,6 +210,8 @@ def create_job(
     route: str | None = None,
     product_code: str | None = None,
     batch_date: str | None = None,
+    concurrency: int | None = None,
+    model_concurrency: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     if not questions:
         raise ValueError("问题列表为空")
@@ -138,6 +225,17 @@ def create_job(
     # 链路控制：普通用户强制走中继；admin 可显式选 direct
     if role != "admin" or route not in ("relay", "direct"):
         route = "relay"
+    # 并发：默认 20；仅 admin 可调（全局与按模型）
+    if role != "admin":
+        concurrency = DEFAULT_CONCURRENCY
+        model_concurrency = None
+    concurrency = max(1, min(int(concurrency or DEFAULT_CONCURRENCY), MAX_CONCURRENCY))
+    if model_concurrency:
+        model_concurrency = {
+            key: max(1, min(int(value), MAX_CONCURRENCY))
+            for key, value in model_concurrency.items()
+            if key in models
+        } or None
     # 批次归属：产品必须在主数据中（趋势锚点），批次日期默认当天
     product_code = (product_code or "").strip() or None
     if product_code:
@@ -166,8 +264,9 @@ def create_job(
             INSERT INTO jobs (
                 job_id, username, dataset_id, dataset_name, status, models_json,
                 model_overrides_json, search_mode, rounds, route, question_count,
-                created_at, product_code, batch_date
-            ) VALUES (?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                created_at, product_code, batch_date,
+                concurrency, model_concurrency_json, total_calls
+            ) VALUES (?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 job_id,
@@ -183,6 +282,9 @@ def create_job(
                 _now(),
                 product_code,
                 batch_date,
+                concurrency,
+                json.dumps(model_concurrency, ensure_ascii=False) if model_concurrency else None,
+                _estimate_total_calls(len(questions), models, search_mode, rounds),
             ),
         )
 
@@ -240,10 +342,16 @@ def _stage_env(job: dict[str, Any], job_dir: Path) -> dict[str, str]:
     kb = user_kb_path(job["username"]) or GLOBAL_KB_PATH
     env["GEO_KB_FILE"] = str(kb)
     env["GEO_ACCURACY_LEVELS"] = "all"
+    # 并发：全局 + 按模型覆盖
+    env["GEO_CONCURRENCY"] = str(job.get("concurrency") or DEFAULT_CONCURRENCY)
+    if job.get("model_concurrency_json"):
+        env["GEO_MODEL_CONCURRENCY"] = job["model_concurrency_json"]
     return env
 
 
-def _run_stage(name: str, command: list[str], env: dict[str, str], log_path: Path) -> int:
+def _run_stage(
+    name: str, command: list[str], env: dict[str, str], log_path: Path, job_id: str = ""
+) -> int:
     with log_path.open("a", encoding="utf-8", errors="replace") as log:
         log.write(f"\n===== [{_now()}] stage: {name} =====\n$ {' '.join(command)}\n")
         log.flush()
@@ -257,11 +365,16 @@ def _run_stage(name: str, command: list[str], env: dict[str, str], log_path: Pat
             encoding="utf-8",
             errors="replace",
         )
-        assert process.stdout is not None
-        for line in process.stdout:
-            log.write(line)
-            log.flush()
-        return process.wait()
+        if job_id:
+            _RUNNING_PROCS[job_id] = process
+        try:
+            assert process.stdout is not None
+            for line in process.stdout:
+                log.write(line)
+                log.flush()
+            return process.wait()
+        finally:
+            _RUNNING_PROCS.pop(job_id, None)
 
 
 def _run_job(job_id: str) -> None:
@@ -274,10 +387,16 @@ def _run_job(job_id: str) -> None:
 
     env = _stage_env(job, job_dir)
     for stage_name, script, critical in STAGES:
+        if job_id in _CANCEL_FLAGS:
+            return  # 已被取消，状态由 cancel_job 写入
         _update_job(job_id, stage=stage_name)
         exit_code = _run_stage(
-            stage_name, [sys.executable, str(SCRIPTS_DIR / script)], env, log_path
+            stage_name, [sys.executable, str(SCRIPTS_DIR / script)], env, log_path, job_id
         )
+        if job_id in _CANCEL_FLAGS:
+            with log_path.open("a", encoding="utf-8") as log:
+                log.write(f"\n[cancelled] 任务被用户取消于 {stage_name} 阶段\n")
+            return
         if exit_code != 0:
             if critical:
                 _update_job(
@@ -306,7 +425,11 @@ def _run_job(job_id: str) -> None:
         import_cmd += ["--product-code", job["product_code"]]
     if job.get("batch_date"):
         import_cmd += ["--batch-date", job["batch_date"]]
-    exit_code = _run_stage("import", import_cmd, env, log_path)
+    if job_id in _CANCEL_FLAGS:
+        return
+    exit_code = _run_stage("import", import_cmd, env, log_path, job_id)
+    if job_id in _CANCEL_FLAGS:
+        return
     if exit_code != 0:
         _update_job(
             job_id, status="failed", stage="import",
@@ -320,7 +443,9 @@ def _run_job(job_id: str) -> None:
         sys.executable, str(SCRIPTS_DIR / "manage_geo_sqlite.py"), "materialize",
         "--dataset-id", job["dataset_id"],
     ]
-    exit_code = _run_stage("materialize", materialize_cmd, env, log_path)
+    exit_code = _run_stage("materialize", materialize_cmd, env, log_path, job_id)
+    if job_id in _CANCEL_FLAGS:
+        return
     if exit_code != 0:
         _update_job(
             job_id, status="failed", stage="materialize",

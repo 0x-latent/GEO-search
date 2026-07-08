@@ -35,6 +35,8 @@ class JobPayload(BaseModel):
     route: str | None = None
     product_code: str | None = None
     batch_date: str | None = None
+    concurrency: int | None = None
+    model_concurrency: dict[str, int] = Field(default_factory=dict)
 
 
 @router.get("/options")
@@ -62,6 +64,9 @@ def get_job_options(request: Request) -> dict[str, Any]:
         "default_rounds": job_settings.get("rounds", 1),
         "can_choose_route": user["role"] == "admin",
         "default_route": "relay" if (config.get("relay") or {}).get("enabled") else "direct",
+        "default_concurrency": job_store.DEFAULT_CONCURRENCY,
+        "max_concurrency": job_store.MAX_CONCURRENCY,
+        "can_tune_concurrency": user["role"] == "admin",
     }
 
 
@@ -134,7 +139,37 @@ def create_job(payload: JobPayload, request: Request) -> dict[str, Any]:
             route=payload.route,
             product_code=payload.product_code,
             batch_date=payload.batch_date,
+            concurrency=payload.concurrency,
+            model_concurrency=payload.model_concurrency or None,
         )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+def _owned_job(job_id: str, request: Request) -> dict[str, Any]:
+    user = _current_user(request)
+    job = job_store.get_job(job_id)
+    if job is None or (user["role"] != "admin" and job["username"] != user["username"]):
+        raise HTTPException(status_code=404, detail="任务不存在")
+    return job
+
+
+@router.post("/{job_id}/retry")
+def retry_job(job_id: str, request: Request) -> dict[str, Any]:
+    """失败/已取消任务断点续跑（03/05/07 各自跳过已完成部分）。"""
+    _owned_job(job_id, request)
+    try:
+        return job_store.retry_job(job_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/{job_id}/cancel")
+def cancel_job(job_id: str, request: Request) -> dict[str, Any]:
+    """取消排队/执行中的任务；已完成部分保留，可用重试续跑。"""
+    _owned_job(job_id, request)
+    try:
+        return job_store.cancel_job(job_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

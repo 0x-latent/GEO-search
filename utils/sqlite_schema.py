@@ -207,6 +207,28 @@ CREATE TABLE IF NOT EXISTS metrics_recommendation (
     FOREIGN KEY (dataset_id) REFERENCES datasets(dataset_id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS metrics_scenario (
+    dataset_id TEXT NOT NULL,
+    product_code TEXT NOT NULL,
+    scenario TEXT NOT NULL,
+    model TEXT NOT NULL,
+    search_enabled TEXT NOT NULL,
+    question_count INTEGER,
+    total_answers INTEGER,
+    brand_mention_count INTEGER,
+    brand_mention_rate REAL,
+    brand_rec_count INTEGER,
+    brand_rec_rate REAL,
+    generic_mention_count INTEGER,
+    competitor_mention_count INTEGER,
+    negative_count INTEGER,
+    negative_rate REAL,
+    top_categories_json TEXT NOT NULL DEFAULT '[]',
+    extra_json TEXT NOT NULL DEFAULT '{}',
+    PRIMARY KEY (dataset_id, product_code, scenario, model, search_enabled),
+    FOREIGN KEY (dataset_id) REFERENCES datasets(dataset_id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS metric_evidence (
     dataset_id TEXT NOT NULL,
     evidence_type TEXT NOT NULL,
@@ -235,6 +257,8 @@ CREATE INDEX IF NOT EXISTS idx_metrics_rec_lookup
     ON metrics_recommendation(dataset_id, product_code, question_level, model, search_enabled);
 CREATE INDEX IF NOT EXISTS idx_dataset_products_product
     ON dataset_products(product_code, question_set_id);
+CREATE INDEX IF NOT EXISTS idx_metrics_scenario_lookup
+    ON metrics_scenario(dataset_id, product_code, scenario);
 """
 
 # 已有库的惰性加列（CREATE TABLE IF NOT EXISTS 对已存在的表不生效）

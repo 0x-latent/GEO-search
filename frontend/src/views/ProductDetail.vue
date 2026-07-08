@@ -6,7 +6,7 @@ import { ElMessage } from "element-plus";
 import { api, query } from "@/api/client";
 import EvidenceDrawer from "@/components/product/EvidenceDrawer.vue";
 import StageSection from "@/components/product/StageSection.vue";
-import { SEARCH_LABELS } from "@/utils/format";
+import { SEARCH_LABELS, fmtNumber, fmtRate } from "@/utils/format";
 
 const route = useRoute();
 const router = useRouter();
@@ -20,7 +20,22 @@ const filters = reactive({
   search: "",
 });
 
-const drawer = reactive({ visible: false, type: "recommendation", stage: "", title: "" });
+const drawer = reactive({ visible: false, type: "recommendation", stage: "", title: "", scenario: "" });
+
+// 场景证据类型：标准数据集用推荐抽取明细，厂商预聚合数据集用专项指标
+const scenarioEvidenceType = computed(() => {
+  const stages = journey.value?.stages || {};
+  const hasRec = Object.values(stages).some((s) => (s.evidence_counts || {}).recommendation > 0);
+  return hasRec ? "recommendation" : "yang_metric";
+});
+
+function openScenarioEvidence(row) {
+  drawer.type = scenarioEvidenceType.value;
+  drawer.stage = "";
+  drawer.scenario = row.scenario;
+  drawer.title = journey.value?.product_name || "";
+  drawer.visible = true;
+}
 
 async function load() {
   loading.value = true;
@@ -49,6 +64,7 @@ watch(() => [filters.datasetId, filters.model, filters.search], load);
 function openEvidence({ type, stage }) {
   drawer.type = type;
   drawer.stage = stage;
+  drawer.scenario = "";
   drawer.title = journey.value?.product_name || "";
   drawer.visible = true;
 }
@@ -107,6 +123,57 @@ function openEvidence({ type, stage }) {
           :product-name="journey.product_name"
           @open-evidence="openEvidence"
         />
+
+        <el-card v-if="journey.scenarios?.length" class="scenario-card" shadow="never">
+          <div class="scenario-head">
+            <div>
+              <h2>场景拆解</h2>
+              <p class="muted">
+                同一消费场景（如"吃辣胃痛"）下多个问题的汇总表现——三阶段之外的横向视角，
+                回答"在这个具体场景里我们被推荐了吗"。
+              </p>
+            </div>
+          </div>
+          <el-table :data="journey.scenarios" size="small" :default-sort="{ prop: 'brand_mention_rate', order: 'descending' }">
+            <el-table-column prop="scenario" label="场景" min-width="150" />
+            <el-table-column label="问题数" width="80">
+              <template #default="{ row }">{{ fmtNumber(row.question_count) }}</template>
+            </el-table-column>
+            <el-table-column label="回答样本" width="90">
+              <template #default="{ row }">{{ fmtNumber(row.total_answers) }}</template>
+            </el-table-column>
+            <el-table-column prop="brand_mention_rate" label="品牌提及/能见度" width="140" sortable>
+              <template #default="{ row }">
+                <b>{{ fmtRate(row.brand_mention_rate) }}</b>
+              </template>
+            </el-table-column>
+            <el-table-column label="品牌推荐/前三率" width="140">
+              <template #default="{ row }">{{ fmtRate(row.brand_rec_rate) }}</template>
+            </el-table-column>
+            <el-table-column label="我方负面" width="90">
+              <template #default="{ row }">
+                <span :style="row.negative_count ? 'color:#b91c1c;font-weight:600' : ''">
+                  {{ row.negative_count ?? "—" }}
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column label="AI 推荐的品类" min-width="180">
+              <template #default="{ row }">
+                <el-tag v-for="cat in row.top_categories" :key="cat.category" size="small" effect="plain" style="margin-right: 4px">
+                  {{ cat.category }}
+                </el-tag>
+                <span v-if="!row.top_categories?.length" class="muted">—</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="" width="90">
+              <template #default="{ row }">
+                <el-button link type="primary" size="small" @click="openScenarioEvidence(row)">
+                  查看证据
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
       </template>
 
       <EvidenceDrawer
@@ -116,12 +183,24 @@ function openEvidence({ type, stage }) {
         :stage="drawer.stage"
         :type="drawer.type"
         :title="drawer.title"
+        :scenario="drawer.scenario"
       />
     </template>
   </div>
 </template>
 
 <style scoped>
+.scenario-card {
+  margin-bottom: 16px;
+}
+.scenario-head h2 {
+  font-size: 16px;
+  margin: 0 0 2px;
+}
+.scenario-head p {
+  margin: 0 0 10px;
+  font-size: 12px;
+}
 .detail-head {
   display: flex;
   justify-content: space-between;

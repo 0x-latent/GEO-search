@@ -69,15 +69,16 @@ def get_evidence(
     rec_product: str | None = None,
     strength: str | None = None,
     verdict: str | None = None,
+    scenario: str | None = None,
     page: int = 1,
     size: int = 50,
 ) -> dict[str, Any]:
-    """证据链：指标 → 问题级明细（推荐/负面/准确率/品类）。"""
+    """证据链：指标 → 问题级明细（推荐/负面/准确率/品类），可按场景过滤。"""
     allowed = _dataset_scope(request)
     try:
         return insight_store.evidence_list(
             dataset_id, type, product_code, stage, model, search_enabled,
-            rec_product, strength, verdict, page, size, allowed,
+            rec_product, strength, verdict, scenario, page, size, allowed,
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

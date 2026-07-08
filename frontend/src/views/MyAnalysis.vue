@@ -44,6 +44,8 @@ const form = reactive({
   route: "relay",
   selectedModels: [],
   variantByModel: {},
+  concurrency: 20,
+  concurrencyByModel: {},
 });
 
 onMounted(async () => {
@@ -51,9 +53,11 @@ onMounted(async () => {
     options.value = await api("/api/jobs/options");
     form.rounds = options.value.default_rounds || 1;
     form.route = options.value.default_route || "relay";
+    form.concurrency = options.value.default_concurrency || 20;
     form.selectedModels = options.value.models.map((m) => m.key);
     for (const model of options.value.models) {
       form.variantByModel[model.key] = model.default_model;
+      form.concurrencyByModel[model.key] = options.value.default_concurrency || 20;
     }
   } catch (error) {
     ElMessage.error(`加载选项失败：${error.message}`);
@@ -151,6 +155,14 @@ async function submitJob() {
       overrides[model.key] = form.variantByModel[model.key];
     }
   }
+  const concurrencyOverrides = {};
+  if (options.value.can_tune_concurrency) {
+    for (const key of form.selectedModels) {
+      if (form.concurrencyByModel[key] !== form.concurrency) {
+        concurrencyOverrides[key] = form.concurrencyByModel[key];
+      }
+    }
+  }
   try {
     await apiJson("/api/jobs", "POST", {
       dataset_name: form.datasetName.trim(),
@@ -162,6 +174,8 @@ async function submitJob() {
       route: form.route,
       product_code: form.productCode || null,
       batch_date: form.batchDate,
+      concurrency: form.concurrency,
+      model_concurrency: concurrencyOverrides,
     });
     ElMessage.success("任务已提交，正在排队执行");
     parsed.value = null;
@@ -183,6 +197,7 @@ const STATUS_META = {
   running: { label: "执行中", tone: "warning" },
   success: { label: "已完成", tone: "success" },
   failed: { label: "失败", tone: "danger" },
+  cancelled: { label: "已取消", tone: "info" },
 };
 const STAGE_LABELS = {
   collect: "采集回答",
@@ -216,9 +231,49 @@ onBeforeUnmount(() => clearInterval(timer));
 
 function stageProgress(job) {
   if (job.status === "success") return 100;
+  // 采集阶段占大头：有细粒度进度时按 5%~70% 区间映射
+  if (job.stage === "collect" && job.collect_progress?.total) {
+    const frac = job.collect_progress.done / job.collect_progress.total;
+    return Math.round(5 + frac * 65);
+  }
   const index = STAGE_ORDER.indexOf(job.stage);
   if (index < 0) return 5;
   return Math.round(((index + 1) / STAGE_ORDER.length) * 100);
+}
+
+function stageText(job) {
+  const label = STAGE_LABELS[job.stage] || job.stage || "—";
+  if (job.stage === "collect" && job.collect_progress?.total) {
+    return `${label} ${job.collect_progress.done}/${job.collect_progress.total}`;
+  }
+  return label;
+}
+
+async function retryJob(job) {
+  try {
+    await api(`/api/jobs/${encodeURIComponent(job.job_id)}/retry`, { method: "POST" });
+    ElMessage.success("已重新入队，将从断点继续");
+    await loadJobs();
+  } catch (error) {
+    ElMessage.error(`重试失败：${error.message}`);
+  }
+}
+
+async function cancelJob(job) {
+  try {
+    await ElMessageBox.confirm("确认取消该任务？已完成的调用会保留，之后可用「重试」从断点继续。", "取消任务", {
+      type: "warning",
+    });
+  } catch {
+    return;
+  }
+  try {
+    await api(`/api/jobs/${encodeURIComponent(job.job_id)}/cancel`, { method: "POST" });
+    ElMessage.success("已取消");
+    await loadJobs();
+  } catch (error) {
+    ElMessage.error(`取消失败：${error.message}`);
+  }
 }
 
 // ---------- 日志 ----------
@@ -409,6 +464,17 @@ function viewDataset(job) {
               </el-select>
             </el-form-item>
           </el-col>
+          <el-col :span="8" v-if="options.can_tune_concurrency">
+            <el-form-item label="并发数">
+              <el-input-number
+                v-model="form.concurrency"
+                :min="1"
+                :max="options.max_concurrency || 50"
+                style="width: 100%"
+                @change="(v) => { for (const k of Object.keys(form.concurrencyByModel)) form.concurrencyByModel[k] = v; }"
+              />
+            </el-form-item>
+          </el-col>
         </el-row>
         <el-form-item label="模型">
           <div class="model-picker">
@@ -426,16 +492,31 @@ function viewDataset(job) {
                   {{ model.supports_search ? "支持联网" : "不联网" }}
                 </el-tag>
               </el-checkbox>
-              <el-select v-model="form.variantByModel[model.key]" size="small" style="width: 210px">
-                <el-option
-                  v-for="variant in model.variants"
-                  :key="variant.id"
-                  :value="variant.id"
-                  :label="variant.label"
-                />
-              </el-select>
+              <el-space :size="6">
+                <el-select v-model="form.variantByModel[model.key]" size="small" style="width: 190px">
+                  <el-option
+                    v-for="variant in model.variants"
+                    :key="variant.id"
+                    :value="variant.id"
+                    :label="variant.label"
+                  />
+                </el-select>
+                <el-tooltip v-if="options.can_tune_concurrency" content="该模型并发数" placement="top">
+                  <el-input-number
+                    v-model="form.concurrencyByModel[model.key]"
+                    :min="1"
+                    :max="options.max_concurrency || 50"
+                    size="small"
+                    :controls="false"
+                    style="width: 58px"
+                  />
+                </el-tooltip>
+              </el-space>
             </div>
           </div>
+          <p class="muted" style="font-size: 12px; margin: 6px 0 0; width: 100%">
+            所有平台同时并发采集{{ options.can_tune_concurrency ? "，可全局或按模型调整（遇限流会自适应降速）" : "，默认每模型并发 " + (options.default_concurrency || 20) }}。
+          </p>
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="submitJob">
@@ -462,21 +543,21 @@ function viewDataset(job) {
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="进度" min-width="170">
+        <el-table-column label="进度" min-width="190">
           <template #default="{ row }">
             <el-progress
               :percentage="stageProgress(row)"
               :status="row.status === 'failed' ? 'exception' : row.status === 'success' ? 'success' : undefined"
               :stroke-width="8"
             >
-              <span style="font-size: 12px">{{ STAGE_LABELS[row.stage] || row.stage || "—" }}</span>
+              <span style="font-size: 12px">{{ stageText(row) }}</span>
             </el-progress>
           </template>
         </el-table-column>
         <el-table-column prop="question_count" label="题数" width="60" />
         <el-table-column prop="batch_date" label="批次" width="100" />
         <el-table-column prop="created_at" label="创建时间" width="150" />
-        <el-table-column label="操作" width="190" fixed="right">
+        <el-table-column label="操作" width="230" fixed="right">
           <template #default="{ row }">
             <el-button link size="small" @click="showLog(row)">日志</el-button>
             <el-button
@@ -488,7 +569,25 @@ function viewDataset(job) {
             >
               查看分析 →
             </el-button>
-            <el-tooltip v-if="row.error" :content="row.error" placement="top">
+            <el-button
+              v-if="row.status === 'failed' || row.status === 'cancelled'"
+              link
+              type="primary"
+              size="small"
+              @click="retryJob(row)"
+            >
+              断点重试
+            </el-button>
+            <el-button
+              v-if="row.status === 'queued' || row.status === 'running'"
+              link
+              type="danger"
+              size="small"
+              @click="cancelJob(row)"
+            >
+              取消
+            </el-button>
+            <el-tooltip v-if="row.error && row.status === 'failed'" :content="row.error" placement="top">
               <el-button link type="danger" size="small">错误</el-button>
             </el-tooltip>
           </template>

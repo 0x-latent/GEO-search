@@ -332,6 +332,72 @@ def _trend_points(
     return points
 
 
+def _scenario_breakdown(
+    conn: sqlite3.Connection,
+    dataset_id: str,
+    product_code: str,
+    model: str | None,
+    search: str | None,
+) -> list[dict[str, Any]]:
+    """场景拆解：跨模型/联网聚合每个场景的品牌表现（按回答量加权）。"""
+    conds = ["dataset_id = ?", "product_code = ?"]
+    params: list[Any] = [dataset_id, product_code]
+    if model:
+        conds.append("model = ?")
+        params.append(model)
+    if search:
+        conds.append("search_enabled = ?")
+        params.append(search)
+    rows = _rows(conn.execute(
+        f"SELECT * FROM metrics_scenario WHERE {' AND '.join(conds)}", params
+    ))
+    grouped: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        item = grouped.setdefault(row["scenario"], {
+            "scenario": row["scenario"],
+            "question_count": 0,
+            "total_answers": 0,
+            "_mention": [], "_rec": [], "_neg": [],
+            "negative_count": 0,
+            "_categories": {},
+            "sources": set(),
+        })
+        item["question_count"] = max(item["question_count"], row["question_count"] or 0)
+        item["total_answers"] += row["total_answers"] or 0
+        weight = row["total_answers"] or 1
+        if row["brand_mention_rate"] is not None:
+            item["_mention"].append((row["brand_mention_rate"], weight))
+        if row["brand_rec_rate"] is not None:
+            item["_rec"].append((row["brand_rec_rate"], weight))
+        if row["negative_rate"] is not None:
+            item["_neg"].append((row["negative_rate"], weight))
+        item["negative_count"] += row["negative_count"] or 0
+        item["sources"].add(row["search_enabled"])
+        try:
+            for cat in json.loads(row["top_categories_json"] or "[]"):
+                item["_categories"][cat["category"]] = (
+                    item["_categories"].get(cat["category"], 0) + cat["count"]
+                )
+        except (TypeError, ValueError, KeyError):
+            pass
+    result = []
+    for item in grouped.values():
+        top = sorted(item["_categories"].items(), key=lambda x: -x[1])[:3]
+        result.append({
+            "scenario": item["scenario"],
+            "question_count": item["question_count"],
+            "total_answers": item["total_answers"],
+            "brand_mention_rate": _wavg(item["_mention"]),
+            "brand_rec_rate": _wavg(item["_rec"]),
+            "negative_count": item["negative_count"],
+            "negative_rate": _wavg(item["_neg"]),
+            "top_categories": [{"category": c, "count": n} for c, n in top],
+            "is_vendor_agg": item["sources"] == {"agg"},
+        })
+    result.sort(key=lambda x: -(x["brand_mention_rate"] or 0))
+    return result
+
+
 def product_journey(
     product_code: str,
     dataset_id: str | None = None,
@@ -413,6 +479,9 @@ def product_journey(
                 "search_modes": sorted({r["search_enabled"] for r in available}),
             },
             "stages": stages,
+            "scenarios": _scenario_breakdown(
+                conn, selected["dataset_id"], product_code, model, search
+            ),
         }
 
 
@@ -464,6 +533,7 @@ def evidence_list(
     rec_product: str | None = None,
     strength: str | None = None,
     verdict: str | None = None,
+    scenario: str | None = None,
     page: int = 1,
     size: int = 50,
     allowed: list[str] | None = None,
@@ -481,6 +551,7 @@ def evidence_list(
         ("e.rec_product", rec_product),
         ("e.strength", strength),
         ("e.verdict", verdict),
+        ("q.scenario", scenario),
     ):
         if value:
             conds.append(f"{column} = ?")
@@ -491,7 +562,14 @@ def evidence_list(
     where = " AND ".join(conds)
     with _connect() as conn:
         total = conn.execute(
-            f"SELECT COUNT(*) FROM metric_evidence e WHERE {where}", params
+            f"""
+            SELECT COUNT(*)
+            FROM metric_evidence e
+            LEFT JOIN questions q
+              ON q.dataset_id = e.dataset_id AND q.question_id = e.question_id
+            WHERE {where}
+            """,
+            params,
         ).fetchone()[0]
         rows = _rows(conn.execute(
             f"""

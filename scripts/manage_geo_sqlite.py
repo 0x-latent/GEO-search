@@ -828,7 +828,10 @@ def materialize_dataset(conn: sqlite3.Connection, dataset_id: str) -> dict[str, 
         text = clean_text(label)
         return label_to_code.get(text) or (text and stable_hash(text, length=10)) or "unknown"
 
-    for table in ("metrics_summary", "metrics_recommendation", "metric_evidence", "dataset_products"):
+    for table in (
+        "metrics_summary", "metrics_recommendation", "metric_evidence",
+        "metrics_scenario", "dataset_products",
+    ):
         conn.execute(f"DELETE FROM {table} WHERE dataset_id = ?", (dataset_id,))
 
     stats = {"summary": 0, "recommendation": 0, "evidence": 0}
@@ -1106,6 +1109,14 @@ def materialize_dataset(conn: sqlite3.Connection, dataset_id: str) -> dict[str, 
     ).fetchall()
     yang_agg: dict[tuple[str, str, str], dict[str, Any]] = {}
     yang_evidence_count = 0
+    # 提问词（完整问题文本）→ question_id，让专项证据也能关联场景/原始回答
+    qtext_to_qid = {
+        clean_text(row[0]): row[1]
+        for row in conn.execute(
+            "SELECT question_text, question_id FROM questions WHERE dataset_id = ?",
+            (dataset_id,),
+        )
+    }
     for table_name, row_json in yang_rows:
         payload = json.loads(row_json)
         payload = {k: (None if isinstance(v, float) and math.isnan(v) else v) for k, v in payload.items()}
@@ -1132,7 +1143,7 @@ def materialize_dataset(conn: sqlite3.Connection, dataset_id: str) -> dict[str, 
             product_code="weitai",
             stage=stage_for_level(source_level),
             question_level=source_level,
-            question_id="",
+            question_id=qtext_to_qid.get(clean_text(payload.get("提问词")), ""),
             model=model,
             rec_product=brand,
             name_type="目标品牌",
@@ -1194,6 +1205,157 @@ def materialize_dataset(conn: sqlite3.Connection, dataset_id: str) -> dict[str, 
                     avg_rank=avg_rank,
                     extra={"_source": "yang", "label": "养胃舒专项", "目标品牌": brand},
                 )
+
+    # ---- 6.5) 场景维度聚合：同一场景下多个问题的品牌表现 ----
+    # 全部由库内表计算（questions.scenario + answers + metric_evidence），
+    # 不依赖 CSV 或用户配置，回刷/新任务后重跑 materialize 即可刷新。
+    scenario_rows = conn.execute(
+        """
+        SELECT q.product_code, q.scenario, a.model, a.search_enabled,
+               COUNT(DISTINCT q.question_id) AS question_count,
+               COUNT(*) AS total_answers
+        FROM answers a
+        JOIN questions q ON q.dataset_id = a.dataset_id AND q.question_id = a.question_id
+        WHERE a.dataset_id = ? AND COALESCE(q.scenario, '') <> ''
+        GROUP BY q.product_code, q.scenario, a.model, a.search_enabled
+        """,
+        (dataset_id,),
+    ).fetchall()
+    if scenario_rows:
+        ev_counts: dict[tuple, dict[str, int]] = {}
+        ev_rows = conn.execute(
+            """
+            SELECT e.product_code, q.scenario, e.model, e.search_enabled,
+                   e.name_type, e.strength,
+                   json_extract(e.payload_json, '$.情感') AS sentiment,
+                   COUNT(*) AS c
+            FROM metric_evidence e
+            JOIN questions q ON q.dataset_id = e.dataset_id AND q.question_id = e.question_id
+            WHERE e.dataset_id = ? AND e.evidence_type = 'recommendation'
+              AND COALESCE(q.scenario, '') <> ''
+            GROUP BY e.product_code, q.scenario, e.model, e.search_enabled,
+                     e.name_type, e.strength, sentiment
+            """,
+            (dataset_id,),
+        ).fetchall()
+        for pcode_v, scenario, model, sea, name_type, strength, sentiment, count in ev_rows:
+            key = (pcode_v, scenario, model, str(sea))
+            agg = ev_counts.setdefault(key, {
+                "brand_m": 0, "brand_r": 0, "generic_m": 0, "comp_m": 0, "neg": 0,
+            })
+            is_rec = strength in ("strong", "moderate")
+            if name_type == "999品牌":
+                agg["brand_m"] += count
+                if is_rec:
+                    agg["brand_r"] += count
+                if sentiment == "negative":
+                    agg["neg"] += count
+            elif name_type == "通用名":
+                agg["generic_m"] += count
+            elif name_type == "竞品品牌":
+                agg["comp_m"] += count
+        cat_rows = conn.execute(
+            """
+            SELECT e.product_code, q.scenario, e.model, e.search_enabled,
+                   json_extract(e.payload_json, '$.品类') AS category, COUNT(*) AS c
+            FROM metric_evidence e
+            JOIN questions q ON q.dataset_id = e.dataset_id AND q.question_id = e.question_id
+            WHERE e.dataset_id = ? AND e.evidence_type = 'category'
+              AND COALESCE(q.scenario, '') <> ''
+              AND COALESCE(json_extract(e.payload_json, '$.品类'), '') <> ''
+            GROUP BY e.product_code, q.scenario, e.model, e.search_enabled, category
+            """,
+            (dataset_id,),
+        ).fetchall()
+        cat_top: dict[tuple, list] = {}
+        for pcode_v, scenario, model, sea, category, count in cat_rows:
+            cat_top.setdefault((pcode_v, scenario, model, str(sea)), []).append(
+                {"category": category, "count": count}
+            )
+        # 数据集完全没有推荐抽取证据时（如厂商预聚合导入），品牌字段置 NULL 而非 0，
+        # 避免"0 提及"误读；养胃舒的品牌能见度由下方专项分支按场景补充。
+        has_rec_evidence = bool(ev_rows)
+        for pcode_v, scenario, model, sea, question_count, total_answers in scenario_rows:
+            key = (pcode_v, scenario, model, str(sea))
+            agg = ev_counts.get(key, {})
+            top = sorted(cat_top.get(key, []), key=lambda x: -x["count"])[:5]
+            brand_m = agg.get("brand_m", 0) if has_rec_evidence else None
+            brand_r = agg.get("brand_r", 0) if has_rec_evidence else None
+            neg = agg.get("neg", 0) if has_rec_evidence else None
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO metrics_scenario (
+                    dataset_id, product_code, scenario, model, search_enabled,
+                    question_count, total_answers,
+                    brand_mention_count, brand_mention_rate,
+                    brand_rec_count, brand_rec_rate,
+                    generic_mention_count, competitor_mention_count,
+                    negative_count, negative_rate, top_categories_json, extra_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}')
+                """,
+                (
+                    dataset_id, pcode_v or "unknown", scenario, model, str(sea),
+                    question_count, total_answers,
+                    brand_m,
+                    round(brand_m / total_answers, 4) if (brand_m is not None and total_answers) else None,
+                    brand_r,
+                    round(brand_r / total_answers, 4) if (brand_r is not None and total_answers) else None,
+                    agg.get("generic_m", 0) if has_rec_evidence else None,
+                    agg.get("comp_m", 0) if has_rec_evidence else None,
+                    neg,
+                    round(neg / total_answers, 4) if (neg is not None and total_answers) else None,
+                    json_dumps(top),
+                ),
+            )
+            stats["scenario"] = stats.get("scenario", 0) + 1
+
+    # 养胃舒专项：厂商预聚合的"提问词级能见度"经问题文本桥接到场景（search='agg'）
+    yang_scenario_agg: dict[tuple[str, str], dict[str, Any]] = {}
+    if yang_rows:
+        qtext_scenario = {
+            row[0]: row[1]
+            for row in conn.execute(
+                "SELECT question_text, scenario FROM questions WHERE dataset_id = ? AND COALESCE(scenario,'') <> ''",
+                (dataset_id,),
+            )
+        }
+        for table_name, row_json in yang_rows:
+            payload = json.loads(row_json)
+            brand = clean_text(payload.get("目标品牌"))
+            if not any(term in brand for term in YANG_BRAND_TERMS):
+                continue
+            scenario = qtext_scenario.get(clean_text(payload.get("提问词")))
+            if not scenario:
+                continue
+            model = clean_text(payload.get("AI模型"))
+            item = yang_scenario_agg.setdefault(
+                (scenario, model), {"visibility": [], "top3": [], "questions": set()}
+            )
+            vis = _num_or_none(payload.get("能见度"))
+            if vis is not None:
+                item["visibility"].append(vis)
+            top3 = _num_or_none(payload.get("前三率"))
+            if top3 is not None:
+                item["top3"].append(top3)
+            item["questions"].add(clean_text(payload.get("提问词")))
+        for (scenario, model), item in yang_scenario_agg.items():
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO metrics_scenario (
+                    dataset_id, product_code, scenario, model, search_enabled,
+                    question_count, total_answers,
+                    brand_mention_rate, brand_rec_rate, top_categories_json, extra_json
+                ) VALUES (?, 'weitai', ?, ?, 'agg', ?, ?, ?, ?, '[]', ?)
+                """,
+                (
+                    dataset_id, scenario, model,
+                    len(item["questions"]), len(item["visibility"]),
+                    _avg_or_none(item["visibility"]),
+                    _avg_or_none(item["top3"]),
+                    json_dumps({"_source": "yang"}),
+                ),
+            )
+            stats["scenario"] = stats.get("scenario", 0) + 1
 
     # ---- 7) 批次归属：dataset_products + 问题集指纹 + 批次日期 ----
     q_rows = conn.execute(

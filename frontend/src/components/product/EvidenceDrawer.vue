@@ -13,6 +13,7 @@ const props = defineProps({
   stage: { type: String, default: "" },
   type: { type: String, default: "recommendation" },
   title: { type: String, default: "证据明细" },
+  scenario: { type: String, default: "" },
 });
 const emit = defineEmits(["update:modelValue"]);
 
@@ -46,7 +47,8 @@ async function load() {
       dataset_id: props.datasetId,
       type: props.type,
       product_code: props.productCode,
-      stage: props.type === "category" ? "" : props.stage,
+      stage: props.scenario ? "" : props.type === "category" ? "" : props.stage,
+      scenario: props.scenario,
       page: page.value,
       size,
     });
@@ -61,7 +63,7 @@ async function load() {
 }
 
 watch(
-  () => [props.modelValue, props.type, props.stage],
+  () => [props.modelValue, props.type, props.stage, props.scenario],
   ([visible]) => {
     if (visible) {
       page.value = 1;
@@ -85,7 +87,7 @@ const STRENGTH_TONES = { strong: "success", moderate: "", mention: "info", cauti
 <template>
   <el-drawer
     :model-value="modelValue"
-    :title="`${title} · ${TYPE_LABELS[type] || type}（共 ${total} 条）`"
+    :title="`${title}${scenario ? ` · 场景「${scenario}」` : ''} · ${TYPE_LABELS[type] || type}（共 ${total} 条）`"
     size="62%"
     @update:model-value="emit('update:modelValue', $event)"
   >

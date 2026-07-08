@@ -28,6 +28,26 @@ ROUNDS_ENV = os.environ.get("GEO_ROUNDS", "")          # 覆盖 query_settings.r
 MODELS_ENV = os.environ.get("GEO_MODELS", "")          # 逗号分隔，只跑这些模型
 MODEL_OVERRIDES_ENV = os.environ.get("GEO_MODEL_OVERRIDES", "")  # JSON: {"qwen": "qwen3.7-max"}
 SEARCH_MODES_ENV = os.environ.get("GEO_SEARCH_MODES", "")  # both / search / nosearch
+CONCURRENCY_ENV = os.environ.get("GEO_CONCURRENCY", "")    # 全局并发覆盖（每模型），如 20
+MODEL_CONCURRENCY_ENV = os.environ.get("GEO_MODEL_CONCURRENCY", "")  # JSON: {"deepseek": 30}
+
+
+def _resolve_concurrency(model_key: str, config_value: int) -> int:
+    """并发优先级：按模型指定 > 全局覆盖 > models.yaml 配置。上限 50 防误配。"""
+    value = None
+    if MODEL_CONCURRENCY_ENV:
+        try:
+            value = json.loads(MODEL_CONCURRENCY_ENV).get(model_key)
+        except json.JSONDecodeError:
+            pass
+    if value is None and CONCURRENCY_ENV:
+        try:
+            value = int(CONCURRENCY_ENV)
+        except ValueError:
+            pass
+    if value is None:
+        value = config_value
+    return max(1, min(int(value), 50))
 
 
 class AdaptiveThrottle:
@@ -279,9 +299,10 @@ async def query_single_model(
     model_dir = os.path.join(RAW_DIR, model_key)
     os.makedirs(model_dir, exist_ok=True)
 
-    concurrency = client.config.get("concurrency", 1)
+    concurrency = _resolve_concurrency(model_key, client.config.get("concurrency", 1))
     interval = client.config.get("request_interval", 0.2)
     throttle = AdaptiveThrottle(model_key, concurrency, interval)
+    logger.info(f"[{model_key}] 并发: {concurrency}")
 
     if SEARCH_MODES_ENV == "search":
         search_modes = [True] if client.supports_search else []
@@ -463,7 +484,7 @@ async def main(rerun_ids: list = None, rerun_models: list = None):
             model_key, model_config, api_key,
             route=route, relay_config=relay_conf, model_override=override,
         )
-        concurrency = model_config.get("concurrency", 1)
+        concurrency = _resolve_concurrency(model_key, model_config.get("concurrency", 1))
         task = query_single_model(
             model_key, client, questions, rounds,
             query_settings, log, completed_keys, lock,
