@@ -18,7 +18,17 @@ const fileInput = ref(null);
 const productKey = ref("");
 const submitting = ref(false);
 const imports = ref([]);
+const allUsers = ref([]);
 let timer = null;
+
+async function loadUsers() {
+  if (!session.isAdmin) return;
+  try {
+    allUsers.value = await api("/api/auth/users");
+  } catch {
+    /* 非关键 */
+  }
+}
 
 const productOptions = computed(() => Object.keys(props.kbData || {}));
 
@@ -52,6 +62,7 @@ function pollIfActive() {
 
 onMounted(() => {
   loadImports();
+  loadUsers();
   timer = setInterval(pollIfActive, 5000);
 });
 onBeforeUnmount(() => clearInterval(timer));
@@ -99,6 +110,8 @@ const review = reactive({
   importId: "",
   productKey: "",
   loading: false,
+  // 合并目标：mine=我的配置 / global=全局默认 / 其他值=指定用户名（归属权划分）
+  target: "mine",
   modules: [], // {id, name, text(可编辑), quotes, verified, adopt, currentText}
 });
 
@@ -143,13 +156,22 @@ async function applyReview() {
     ElMessage.warning("请至少勾选一个模块");
     return;
   }
+  const payload = { modules: adopted, scope: props.scope };
+  if (review.target === "global") {
+    payload.scope = "global";
+  } else if (review.target !== "mine") {
+    payload.scope = "user";
+    payload.target_username = review.target;
+  }
   try {
     const result = await api(`/api/kb-imports/${encodeURIComponent(review.importId)}/apply`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ modules: adopted, scope: props.scope }),
+      body: JSON.stringify(payload),
     });
-    ElMessage.success(`已合并 ${result.applied_modules.length} 个模块到「${result.product_key}」`);
+    ElMessage.success(
+      `已合并 ${result.applied_modules.length} 个模块到「${result.product_key}」（归属：${result.owner}）`
+    );
     review.visible = false;
     emit("applied");
     await loadImports();
@@ -285,6 +307,19 @@ async function applyReview() {
         </div>
       </div>
       <template #footer>
+        <el-space v-if="session.isAdmin" style="float: left">
+          <span class="muted" style="font-size: 13px">合并到</span>
+          <el-select v-model="review.target" size="small" style="width: 200px">
+            <el-option value="mine" label="我的配置" />
+            <el-option value="global" label="全局默认（所有用户）" />
+            <el-option
+              v-for="user in allUsers.filter((u) => u.username !== session.user?.username)"
+              :key="user.username"
+              :value="user.username"
+              :label="`用户：${user.username}`"
+            />
+          </el-select>
+        </el-space>
         <el-button @click="review.visible = false">取消</el-button>
         <el-button type="primary" @click="applyReview">
           合并勾选的模块（{{ review.modules.filter((m) => m.adopt).length }}）

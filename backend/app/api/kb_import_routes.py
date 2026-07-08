@@ -75,16 +75,18 @@ def retry_kb_import(import_id: str, request: Request) -> dict[str, Any]:
 class ApplyPayload(BaseModel):
     modules: dict[str, str]
     scope: str | None = None
+    target_username: str | None = None
 
 
 @router.post("/{import_id}/apply")
 def apply_kb_import(import_id: str, payload: ApplyPayload, request: Request) -> dict[str, Any]:
-    """把审核采纳的模块（可在前端修改后提交）合并进知识库。"""
+    """把审核采纳的模块（可在前端修改后提交）合并进知识库；admin 可指定归属用户。"""
     user = _current_user(request)
     _owned(import_id, request)
     try:
         return kb_import_store.apply_import(
-            import_id, user["username"], user["role"], payload.modules, payload.scope
+            import_id, user["username"], user["role"], payload.modules,
+            payload.scope, payload.target_username,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

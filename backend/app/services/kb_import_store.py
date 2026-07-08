@@ -530,8 +530,13 @@ def apply_import(
     role: str,
     modules: dict[str, str],
     scope: str | None = None,
+    target_username: str | None = None,
 ) -> dict[str, Any]:
-    """把用户勾选采纳的模块（module_id → 最终文本，可在审核时手改）合并进知识库。"""
+    """把用户勾选采纳的模块（module_id → 最终文本，可在审核时手改）合并进知识库。
+
+    管理员可指定 target_username 把知识库合并到其他用户名下（归属权划分，
+    与数据集归属对应）：该用户的分析任务会自动用上这份知识库做准确率校验。
+    """
     from . import user_config_store, yaml_store  # noqa: F401 (yaml_store 保留快照先例)
 
     record = get_import(import_id)
@@ -544,12 +549,21 @@ def apply_import(
     scope = scope or record["scope"]
     if scope == "global" and role != "admin":
         raise ValueError("只有管理员能写入全局知识库")
+    if target_username and target_username != username:
+        if role != "admin":
+            raise ValueError("只有管理员能把知识库合并给其他用户")
+        from . import auth_store
 
+        if target_username not in {u["username"] for u in auth_store.list_users()}:
+            raise ValueError(f"用户不存在：{target_username}")
+        scope = "user"
+
+    owner = target_username or username
     product_key = record["product_key"]
     if scope == "global":
         kb = user_config_store.load_global_kb()
     else:
-        kb = user_config_store.load_effective_kb(username)["data"]
+        kb = user_config_store.load_effective_kb(owner)["data"]
 
     entry = kb.setdefault(product_key, {"product_name": product_key, "modules": {}})
     entry.setdefault("modules", {})
@@ -574,7 +588,12 @@ def apply_import(
         )
         user_config_store.save_global_kb(kb)
     else:
-        user_config_store.save_user_kb(username, kb)
+        user_config_store.save_user_kb(owner, kb)
 
     _update(import_id, applied_at=_now())
-    return {"applied_modules": applied, "scope": scope, "product_key": product_key}
+    return {
+        "applied_modules": applied,
+        "scope": scope,
+        "product_key": product_key,
+        "owner": "全局" if scope == "global" else owner,
+    }
