@@ -23,6 +23,12 @@ const navItems = computed(() => {
 const activePath = computed(() =>
   route.path.startsWith("/products") ? "/overview" : route.path
 );
+
+// 经门户网关访问时（/geo/ 子路径）提供返回门户入口；本地直连无门户，不显示
+const isPortalMode = window.location.pathname.startsWith("/geo");
+function backToPortal() {
+  window.location.href = "/portal/";
+}
 </script>
 
 <template>
@@ -46,6 +52,10 @@ const activePath = computed(() =>
           <span>{{ item.label }}</span>
         </el-menu-item>
       </el-menu>
+      <button v-if="isPortalMode" class="portal-back" @click="backToPortal">
+        <span class="nav-icon">🏠</span>
+        <span>返回门户</span>
+      </button>
       <div class="side-user" v-if="session.user">
         <div>
           <strong>{{ session.user.username }}</strong>
@@ -107,6 +117,23 @@ const activePath = computed(() =>
 }
 .nav-icon {
   margin-right: 8px;
+}
+.portal-back {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 12px 20px;
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: #cfe5e2;
+  font-size: 14px;
+  cursor: pointer;
+  text-align: left;
+}
+.portal-back:hover {
+  background: rgba(15, 118, 110, 0.35);
+  color: #fff;
 }
 .side-user {
   display: flex;
