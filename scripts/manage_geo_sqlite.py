@@ -911,6 +911,10 @@ def materialize_dataset(conn: sqlite3.Connection, dataset_id: str) -> dict[str, 
             if row.get("999品牌负面提及数") is not None
             else None
         )
+        # 负面率优先取 05 按回答去重的新列；旧报表没有该列时退回 条目数/回答数（可能>1，回刷后消失）
+        own_negative_rate = _num_or_none(row.get("999品牌负面提及率"))
+        if own_negative_rate is None and own_negative is not None and total:
+            own_negative_rate = round(own_negative / total, 4)
         insert_summary(
             product_code=pcode(label),
             stage=stage_for_level(level),
@@ -926,7 +930,7 @@ def materialize_dataset(conn: sqlite3.Connection, dataset_id: str) -> dict[str, 
             competitor_mention_rate=_num_or_none(row.get("竞品品牌提及率")),
             competitor_rec_rate=_num_or_none(row.get("竞品品牌推荐率")),
             negative_count=own_negative,
-            negative_rate=round(own_negative / total, 4) if (own_negative is not None and total) else None,
+            negative_rate=own_negative_rate,
             extra={
                 "_source": "mention",
                 "label": label,
@@ -1222,38 +1226,43 @@ def materialize_dataset(conn: sqlite3.Connection, dataset_id: str) -> dict[str, 
         (dataset_id,),
     ).fetchall()
     if scenario_rows:
-        ev_counts: dict[tuple, dict[str, int]] = {}
+        # 计数按"回答"去重（提及过该类型的回答数），率=count/total_answers 天然 ≤ 1；
+        # 按 evidence 行数累计会把一条回答里的多个条目重复计入，率会超过 100%。
+        ev_sets: dict[tuple, dict[str, set]] = {}
         ev_rows = conn.execute(
             """
             SELECT e.product_code, q.scenario, e.model, e.search_enabled,
                    e.name_type, e.strength,
                    json_extract(e.payload_json, '$.情感') AS sentiment,
-                   COUNT(*) AS c
+                   e.question_id, e.round
             FROM metric_evidence e
             JOIN questions q ON q.dataset_id = e.dataset_id AND q.question_id = e.question_id
             WHERE e.dataset_id = ? AND e.evidence_type = 'recommendation'
               AND COALESCE(q.scenario, '') <> ''
-            GROUP BY e.product_code, q.scenario, e.model, e.search_enabled,
-                     e.name_type, e.strength, sentiment
             """,
             (dataset_id,),
         ).fetchall()
-        for pcode_v, scenario, model, sea, name_type, strength, sentiment, count in ev_rows:
+        for pcode_v, scenario, model, sea, name_type, strength, sentiment, qid_v, round_v in ev_rows:
             key = (pcode_v, scenario, model, str(sea))
-            agg = ev_counts.setdefault(key, {
-                "brand_m": 0, "brand_r": 0, "generic_m": 0, "comp_m": 0, "neg": 0,
+            agg = ev_sets.setdefault(key, {
+                "brand_m": set(), "brand_r": set(), "generic_m": set(), "comp_m": set(), "neg": set(),
             })
+            ans = (qid_v, round_v)
             is_rec = strength in ("strong", "moderate")
             if name_type == "999品牌":
-                agg["brand_m"] += count
+                agg["brand_m"].add(ans)
                 if is_rec:
-                    agg["brand_r"] += count
+                    agg["brand_r"].add(ans)
                 if sentiment == "negative":
-                    agg["neg"] += count
+                    agg["neg"].add(ans)
             elif name_type == "通用名":
-                agg["generic_m"] += count
+                agg["generic_m"].add(ans)
             elif name_type == "竞品品牌":
-                agg["comp_m"] += count
+                agg["comp_m"].add(ans)
+        ev_counts = {
+            key: {metric: len(answers) for metric, answers in agg.items()}
+            for key, agg in ev_sets.items()
+        }
         cat_rows = conn.execute(
             """
             SELECT e.product_code, q.scenario, e.model, e.search_enabled,

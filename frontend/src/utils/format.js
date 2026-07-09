@@ -1,10 +1,8 @@
-// 指标格式化：≤1.5 视为比例显示百分比；更大的值是"平均每回答提及次数"类计数均值，
-// 显示为倍数（数据口径允许 >1，如通用名提及率 5.1 = 平均每条回答提及 5.1 个通用名）。
+// 指标格式化：所有"率"均为按回答去重的占比（0-1），直接按百分比显示。
+// 若出现 >100% 说明底层口径回归为条目计数，应修数据而不是在这里兜底。
 export function fmtRate(value, digits = 1) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return "—";
-  const num = Number(value);
-  if (Math.abs(num) > 1.5) return `${num.toFixed(2)}×`;
-  return `${(num * 100).toFixed(digits)}%`;
+  return `${(Number(value) * 100).toFixed(digits)}%`;
 }
 
 export function fmtNumber(value) {
@@ -19,7 +17,7 @@ export function fmtNumber(value) {
 export function fmtDelta(value) {
   if (value === null || value === undefined) return null;
   const num = Number(value);
-  const pct = Math.abs(num) > 1.5 ? `${num.toFixed(2)}` : `${(num * 100).toFixed(1)}pp`;
+  const pct = `${(num * 100).toFixed(1)}pp`;
   return { text: `${num > 0 ? "+" : ""}${pct}`, direction: num > 0 ? "up" : num < 0 ? "down" : "flat" };
 }
 

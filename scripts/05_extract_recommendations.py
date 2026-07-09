@@ -1194,6 +1194,9 @@ def generate_unified_mention_report(detail_df: pd.DataFrame, responses: list):
         "成分品类级_m": 0,
         "负面": 0, "999品牌_负面": 0,
     })
+    # 率的口径必须按"回答"去重：一条回答里列出 5 个通用名只算 1 条"提及过的回答"，
+    # 否则 率=条目数/回答数 会超过 100%（历史上出现过 3.11 这类"率"）。次数列仍是条目数。
+    type_answers = defaultdict(lambda: defaultdict(set))
     for _, row in detail_df.iterrows():
         qid = row["问题ID"]
         level = _get_level(qid)
@@ -1206,6 +1209,7 @@ def generate_unified_mention_report(detail_df: pd.DataFrame, responses: list):
         model = row["模型"]
         search = row["联网"]
         gk = (product, _level_group(level), model, search)
+        ans_key = (qid, model, search, str(row.get("轮次", "")))
 
         rec_product = str(row["推荐产品"])
         nt = _classify(rec_product, cat_key)
@@ -1213,12 +1217,16 @@ def generate_unified_mention_report(detail_df: pd.DataFrame, responses: list):
         is_negative = str(row.get("情感", "") or "") == "negative"
 
         type_counts[gk][f"{nt}_m"] += 1
+        type_answers[gk][f"{nt}_m"].add(ans_key)
         if is_rec and nt != "成分品类级":
             type_counts[gk][f"{nt}_r"] += 1
+            type_answers[gk][f"{nt}_r"].add(ans_key)
         if is_negative:
             type_counts[gk]["负面"] += 1
+            type_answers[gk]["负面"].add(ans_key)
             if nt == "999品牌":
                 type_counts[gk]["999品牌_负面"] += 1
+                type_answers[gk]["999品牌_负面"].add(ans_key)
 
     # === 3. 合并输出 ===
     all_keys = set(answer_totals.keys()) | set(category_hits.keys())
@@ -1228,7 +1236,12 @@ def generate_unified_mention_report(detail_df: pd.DataFrame, responses: list):
         total = answer_totals.get(gk, 0)
         divisor = total if total > 0 else 1
         tc = type_counts.get(gk, {})
+        ta = type_answers.get(gk, {})
         ch = category_hits.get(gk, {})
+
+        def _answer_rate(metric):
+            # 提及过该类型的回答占比（按回答去重，天然 ≤ 1）
+            return round(len(ta.get(metric, ())) / divisor, 3)
 
         row = {
             "产品": product,
@@ -1244,20 +1257,21 @@ def generate_unified_mention_report(detail_df: pd.DataFrame, responses: list):
         else:
             row["品类提及率"] = ""
 
-        # 各类型提及
+        # 各类型提及：次数=抽取条目数（量级参考），率=提及过的回答占比（按回答去重）
         row["999品牌提及次数"] = tc.get("999品牌_m", 0)
-        row["999品牌提及率"] = round(tc.get("999品牌_m", 0) / divisor, 3)
-        row["999品牌推荐率"] = round(tc.get("999品牌_r", 0) / divisor, 3)
+        row["999品牌提及率"] = _answer_rate("999品牌_m")
+        row["999品牌推荐率"] = _answer_rate("999品牌_r")
         row["通用名提及次数"] = tc.get("通用名_m", 0)
-        row["通用名提及率"] = round(tc.get("通用名_m", 0) / divisor, 3)
-        row["通用名推荐率"] = round(tc.get("通用名_r", 0) / divisor, 3)
+        row["通用名提及率"] = _answer_rate("通用名_m")
+        row["通用名推荐率"] = _answer_rate("通用名_r")
         row["竞品品牌提及次数"] = tc.get("竞品品牌_m", 0)
-        row["竞品品牌提及率"] = round(tc.get("竞品品牌_m", 0) / divisor, 3)
-        row["竞品品牌推荐率"] = round(tc.get("竞品品牌_r", 0) / divisor, 3)
+        row["竞品品牌提及率"] = _answer_rate("竞品品牌_m")
+        row["竞品品牌推荐率"] = _answer_rate("竞品品牌_r")
         row["成分品类级提及次数"] = tc.get("成分品类级_m", 0)
         row["负面提及数"] = tc.get("负面", 0)
-        row["负面提及率"] = round(tc.get("负面", 0) / divisor, 3)
+        row["负面提及率"] = _answer_rate("负面")
         row["999品牌负面提及数"] = tc.get("999品牌_负面", 0)
+        row["999品牌负面提及率"] = _answer_rate("999品牌_负面")
 
         rows.append(row)
 

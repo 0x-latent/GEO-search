@@ -111,6 +111,7 @@ def _stage_rollup(rows: list[dict[str, Any]]) -> dict[str, Any]:
     result: dict[str, Any] = {stage: {} for stage in STAGES}
     negative_total = 0
     answers_total = 0
+    negative_rate_points: list[tuple[Any, Any]] = []
     for stage in STAGES:
         mention = [r for r in rows if r["stage"] == stage and r["total_answers"] is not None]
         agg = {
@@ -135,6 +136,9 @@ def _stage_rollup(rows: list[dict[str, Any]]) -> dict[str, Any]:
         result[stage] = agg
         negative_total += agg["negative_count"]
         answers_total += agg["total_answers"] or 0
+        negative_rate_points.extend(
+            (r["negative_rate"], r["total_answers"]) for r in mention
+        )
 
     # 准确率不分阶段兜底：07 对用户上传（统一 q4）也会产出，按全量聚合一份
     accuracy_all = [r for r in rows if r["accuracy_rate"] is not None]
@@ -143,7 +147,8 @@ def _stage_rollup(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "wrong_claims": sum(r["wrong_claims"] or 0 for r in accuracy_all) or 0,
         "total_claims": sum(r["total_claims"] or 0 for r in accuracy_all) or 0,
         "negative_count": negative_total,
-        "negative_rate": round(negative_total / answers_total, 4) if answers_total else None,
+        # 率按行级 negative_rate（回答去重口径）加权平均；negative_count 是条目数，二者口径不同不可互除
+        "negative_rate": _wavg(negative_rate_points),
         "total_answers": answers_total or None,
     }
     return result
