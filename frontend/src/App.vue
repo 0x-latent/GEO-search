@@ -24,10 +24,11 @@ const activePath = computed(() =>
   route.path.startsWith("/products") ? "/overview" : route.path
 );
 
-// 经门户网关访问时（/geo/ 子路径）提供返回门户入口；本地直连无门户，不显示
-const isPortalMode = window.location.pathname.startsWith("/geo");
+// 返回门户：门户挂在同主机 80 端口的 /portal/。GEO 有两种入口（/geo/ 反代、:8001 直连），
+// 都要能回门户，所以用去端口的绝对地址；本地开发（localhost）无门户，不显示。
+const isPortalMode = !["localhost", "127.0.0.1"].includes(window.location.hostname);
 function backToPortal() {
-  window.location.href = "/portal/";
+  window.location.href = `${window.location.protocol}//${window.location.hostname}/portal/`;
 }
 </script>
 
