@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
 
-import { api, apiJson } from "@/api/client";
+import { api, apiJson, appUrl } from "@/api/client";
 
 const router = useRouter();
 
@@ -330,9 +330,9 @@ function viewDataset(job) {
           </el-space>
           <p class="muted" style="font-size: 12px; margin-bottom: 0">
             支持 Excel / CSV / JSON，单次上限 {{ options?.max_questions ?? 500 }} 题，列：问题 / 产品 / 层级 / 场景 · 模板：
-            <a href="/api/templates/questions.xlsx">Excel</a> ·
-            <a href="/api/templates/questions.csv">CSV</a> ·
-            <a href="/api/templates/questions.json">JSON</a>
+            <a :href="appUrl('/api/templates/questions.xlsx')">Excel</a> ·
+            <a :href="appUrl('/api/templates/questions.csv')">CSV</a> ·
+            <a :href="appUrl('/api/templates/questions.json')">JSON</a>
           </p>
         </el-tab-pane>
         <el-tab-pane label="在线填报" name="form">

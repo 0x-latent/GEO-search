@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 
-import { api, apiJson } from "@/api/client";
+import { api, apiJson, appUrl } from "@/api/client";
 import BrandsEditor from "@/components/config/BrandsEditor.vue";
 import KbEditor from "@/components/config/KbEditor.vue";
 import KbImportPanel from "@/components/config/KbImportPanel.vue";
@@ -112,7 +112,7 @@ async function changePassword() {
   try {
     await apiJson("/api/auth/me/password", "PUT", { password: password.value });
     ElMessage.success("密码已修改，请重新登录");
-    window.location.href = "/login.html";
+    window.location.href = appUrl("/login.html");
   } catch (error) {
     ElMessage.error(`修改失败：${error.message}`);
   }

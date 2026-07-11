@@ -68,7 +68,9 @@ async def auth_middleware(request: Request, call_next):
         if user is None:
             if path.startswith("/api"):
                 return JSONResponse({"detail": "未登录"}, status_code=401)
-            return RedirectResponse("/login.html", status_code=302)
+            # 经网关子路径（如 /geo/）访问时 Location 需带回前缀，直连时前缀为空
+            prefix = request.headers.get("x-forwarded-prefix", "").rstrip("/")
+            return RedirectResponse(f"{prefix}/login.html", status_code=302)
         request.state.user = user
         response = await call_next(request)
     # 缓存策略：入口 HTML 每次协商（发版即生效），带内容哈希的资源长缓存
