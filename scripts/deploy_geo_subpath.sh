@@ -11,8 +11,10 @@ rsync -avz --exclude node_modules --exclude __pycache__ --exclude backend/app/st
   ./requirements.txt ./Dockerfile ./.dockerignore \
   aliyun:/opt/geo_search/
 
-echo "== 2/5 服务器重建镜像 =="
-ssh aliyun 'cd /opt/geo_search && docker compose build'
+echo "== 2/5 服务器重建镜像，并收回 8001 公网直连（GEO_BIND=127.0.0.1）=="
+ssh aliyun 'cd /opt/geo_search && touch .env \
+  && (grep -q "^GEO_BIND=" .env && sed -i "s/^GEO_BIND=.*/GEO_BIND=127.0.0.1/" .env || echo "GEO_BIND=127.0.0.1" >> .env) \
+  && docker compose build'
 
 echo "== 3/5 备份并替换 nginx /geo/ 配置段 =="
 ssh aliyun 'cp /etc/nginx/sites-enabled/aigc-creative-workflow \
@@ -40,7 +42,9 @@ ssh aliyun '
   sleep 5
   echo "--- 容器健康 ---"
   docker ps --filter name=geo --format "{{.Names}} {{.Status}}"
-  echo "--- 直连入口 ---"
+  echo "--- 端口绑定（应只剩 127.0.0.1）---"
+  docker port geo_search-geo-web-1
+  echo "--- 直连入口（服务器本机回环）---"
   curl -s -o /dev/null -w "GET /api/health -> %{http_code}\n" http://127.0.0.1:8001/api/health
   curl -s -o /dev/null -w "GET /login.html -> %{http_code}\n" http://127.0.0.1:8001/login.html
   curl -s -o /dev/null -w "GET / 未登录 -> %{http_code} Location=%{redirect_url}\n" http://127.0.0.1:8001/
