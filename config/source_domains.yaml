@@ -85,23 +85,63 @@ suffix_rules:
   - suffix: ac.cn
     category: academic
     authority: A
-
-keyword_rules:
-  - keywords: [hospital, clinic, hosp]
-    category: medical_institution
-    authority: A
-  - keywords: [pubmed, ncbi, cnki, wanfang, medline, who.int]
+  - suffix: who.int
     category: academic
     authority: A
-  - keywords: [health, doctor, yisheng, yiyao, yaopin, ypk, fh21, 39.net, xiaohe]
+  - suffix: 39.net
     category: medical_portal
     authority: B
-  - keywords: [news, xinhuanet, people.com, sohu.com, sina.com, 163.com, qq.com, thepaper]
+  - suffix: xinhuanet.com
     category: news
+    authority: B
+  - suffix: people.com.cn
+    category: news
+    authority: B
+  - suffix: sohu.com
+    category: news
+    authority: B
+  - suffix: sina.com.cn
+    category: news
+    authority: B
+  - suffix: 163.com
+    category: news
+    authority: B
+  - suffix: qq.com
+    category: news
+    authority: B
+  - suffix: thepaper.cn
+    category: news
+    authority: B
+  - suffix: jd.com
+    category: ecommerce
+    authority: C
+  - suffix: tmall.com
+    category: ecommerce
+    authority: C
+  - suffix: taobao.com
+    category: ecommerce
+    authority: C
+  - suffix: 360kad.com
+    category: ecommerce
+    authority: C
+
+# keyword 为无锚点子串匹配，只放真正的词根；域名请写到 suffix_rules（锚定后缀，避免误伤）。
+keyword_rules:
+  - keywords: [hospital, clinic]
+    category: medical_institution
+    authority: A
+  - keywords: [pubmed, ncbi, cnki, wanfang, medline]
+    category: academic
+    authority: A
+  - keywords: [health, doctor, yisheng, yiyao, yaopin, ypk, fh21, xiaohe]
+    category: medical_portal
     authority: B
   - keywords: [zhihu, weibo, xiaohongshu, tieba, douban, reddit, weixin]
     category: ugc
     authority: C
-  - keywords: [jd.com, tmall, taobao, 360kad, yaofang, pharmacy, mall]
+  - keywords: [news]
+    category: news
+    authority: B
+  - keywords: [yaofang, pharmacy]
     category: ecommerce
     authority: C

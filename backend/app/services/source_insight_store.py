@@ -38,8 +38,13 @@ def normalize_domain(domain: str | None, url: str | None = None) -> str:
             raw = (urlsplit(url).hostname or "").lower().rstrip(".")
         except ValueError:
             raw = ""
-    if ":" in raw and not raw.startswith("["):
+    if raw.startswith("["):
+        raw = raw[1:].split("]", 1)[0]
+    elif raw.count(":") == 1:
         raw = raw.split(":", 1)[0]
+    if ":" in raw:
+        # IPv6 字面量没有可归并的域名标签，原样返回。
+        return raw
     labels = [part for part in raw.split(".") if part]
     if len(labels) > 2 and labels[0] in PRESENTATION_SUBDOMAINS:
         labels = labels[1:]
@@ -117,6 +122,8 @@ def classify_domain(domain: str, catalog: dict[str, Any] | None = None) -> dict[
         "ownership": ownership,
         "product_codes": item.get("product_codes") or [],
         "is_official": ownership in {"owned", "competitor"} or category in {"brand_official", "competitor_official"},
+        # 官方覆盖类指标只认我方官方渠道；竞品官网属于 is_official 但不参与我方覆盖。
+        "is_own_official": ownership == "owned" or category == "brand_official",
         "is_authoritative": item.get("authority") == "A",
     }
 
@@ -165,23 +172,31 @@ def _answer_rows(
         SELECT a.dataset_id, a.answer_id, a.question_id, a.product_code,
                COALESCE(a.product_name, a.product_code) AS product_name,
                a.model, COALESCE(a.model_name, a.model) AS model_name,
-               a.search_enabled, a.round, a.answer_text,
+               a.search_enabled, a.round,
+               substr(COALESCE(a.answer_text, ''), 1, 220) AS answer_preview,
                q.question_text, q.level, q.source_level, COALESCE(q.scenario, '') AS scenario,
                EXISTS (
                  SELECT 1 FROM metric_evidence e
                  WHERE e.dataset_id = a.dataset_id
                    AND e.product_code = a.product_code
                    AND e.question_id = a.question_id
-                   AND e.model = a.model
-                   AND COALESCE(e.search_enabled, -1) = a.search_enabled
-                   AND COALESCE(e.round, -1) = a.round
-                   AND e.evidence_type = 'recommendation'
-                   AND e.name_type IN ('999品牌', '目标品牌')
+                   AND e.model IN (a.model, COALESCE(a.model_name, a.model))
+                   AND (e.search_enabled IS NULL OR e.search_enabled = a.search_enabled)
+                   AND (e.round IS NULL OR e.round = a.round)
+                   AND (
+                     (e.evidence_type = 'recommendation'
+                      AND e.name_type IN ('999品牌', '目标品牌'))
+                     OR (e.evidence_type = 'yang_metric'
+                         AND e.name_type = '目标品牌'
+                         AND (CAST(COALESCE(json_extract(e.payload_json, '$."位次"'), 0) AS REAL) > 0
+                              OR CAST(COALESCE(json_extract(e.payload_json, '$."前三率"'), 0) AS REAL) > 0))
+                   )
                ) AS brand_recommended
         FROM answers a
         JOIN questions q
           ON q.dataset_id = a.dataset_id AND q.question_id = a.question_id
         WHERE {where}
+        ORDER BY a.dataset_id, a.product_code, a.question_id, a.model, a.round
         """,
         params,
     )]
@@ -205,6 +220,7 @@ def _source_rows(
     catalog = source_catalog()
     category_filter = set(filters.get("categories") or [])
     domain_filter = {normalize_domain(value) for value in (filters.get("domains") or [])}
+    classified: dict[str, dict[str, Any]] = {}
     rows: list[dict[str, Any]] = []
     cursor = conn.execute(
         f"""
@@ -222,7 +238,9 @@ def _source_rows(
         if key not in answers:
             continue
         normalized = normalize_domain(row.get("domain"), row.get("url"))
-        info = classify_domain(normalized, catalog)
+        info = classified.get(normalized)
+        if info is None:
+            info = classified[normalized] = classify_domain(normalized, catalog)
         if category_filter and info["category"] not in category_filter:
             continue
         if domain_filter and normalized not in domain_filter:
@@ -308,17 +326,29 @@ def list_options(allowed: list[str] | None = None) -> dict[str, Any]:
 def analyze(filters: dict[str, Any], allowed: list[str] | None = None) -> dict[str, Any]:
     catalog = source_catalog()
     configured_official_products: set[str] = set()
+    official_wildcard = False
     for config in catalog.get("domain_overrides", {}).values():
         if config.get("ownership") == "owned" or config.get("category") == "brand_official":
-            configured_official_products.update(config.get("product_codes") or [])
+            codes = config.get("product_codes") or []
+            if codes:
+                configured_official_products.update(codes)
+            else:
+                # 未标注产品的官方域名视为对全部产品生效。
+                official_wildcard = True
     with closing(_connect()) as conn:
         answer_list = _answer_rows(conn, filters, allowed)
         answers = {(row["dataset_id"], row["answer_id"]): row for row in answer_list}
-        selected_sources = _source_rows(conn, answers, filters, allowed)
-
-        # 缺口判定必须看回答的全部信源，不受信源分类/域名筛选影响。
+        # 缺口判定必须看回答的全部信源，不受信源分类/域名筛选影响；
+        # 分类/域名筛选在内存中收窄，避免同一 SQL 跑两遍。
         all_source_filters = {**filters, "categories": [], "domains": []}
         all_sources = _source_rows(conn, answers, all_source_filters, allowed)
+    category_filter = set(filters.get("categories") or [])
+    domain_filter = {normalize_domain(value) for value in (filters.get("domains") or [])}
+    selected_sources = [
+        source for source in all_sources
+        if (not category_filter or source["category"] in category_filter)
+        and (not domain_filter or source["domain"] in domain_filter)
+    ]
 
     selected_by_answer: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     all_by_answer: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
@@ -339,7 +369,7 @@ def analyze(filters: dict[str, Any], allowed: list[str] | None = None) -> dict[s
     for key, sources in selected_by_answer.items():
         answer_product = answers[key]["product_code"]
         if any(
-            source["is_official"]
+            source["is_own_official"]
             and (not source["product_codes"] or answer_product in source["product_codes"])
             for source in sources
         ):
@@ -351,14 +381,14 @@ def analyze(filters: dict[str, Any], allowed: list[str] | None = None) -> dict[s
     denominator = len(denominator_keys)
     official_denominator_keys = {
         key for key in denominator_keys
-        if answers[key]["product_code"] in configured_official_products
+        if official_wildcard or answers[key]["product_code"] in configured_official_products
     }
     summary = {
         "total_answers": total_answers,
         "online_answers": len(online_keys),
         "cited_answers": len(cited_keys),
         "cited_online_answers": len(cited_online),
-        "coverage_rate": round(len(cited_online if online_keys else cited_keys) / denominator, 4) if denominator else None,
+        "coverage_rate": round(len(cited_keys & denominator_keys) / denominator, 4) if denominator else None,
         "source_refs": len(selected_sources),
         "avg_sources_per_cited_answer": round(len(selected_sources) / len(cited_keys), 2) if cited_keys else None,
         "distinct_domains": len({source["domain"] for source in selected_sources if source["domain"]}),
@@ -403,26 +433,26 @@ def analyze(filters: dict[str, Any], allowed: list[str] | None = None) -> dict[s
 
     categories = []
     for item in category_groups.values():
-        answer_count = len(item.pop("answers"))
+        answer_keys = item.pop("answers")
         categories.append({
             **item,
-            "answer_count": answer_count,
+            "answer_count": len(answer_keys),
             "domain_count": len(item.pop("domains")),
             "url_count": len(item.pop("urls")),
-            "coverage_rate": round(answer_count / denominator, 4) if denominator else None,
+            "coverage_rate": round(len(answer_keys & denominator_keys) / denominator, 4) if denominator else None,
         })
     categories.sort(key=lambda item: (-item["answer_count"], item["label"]))
 
     domains = []
     for item in domain_groups.values():
-        answer_count = len(item.pop("answers"))
+        answer_keys = item.pop("answers")
         domains.append({
             **item,
-            "answer_count": answer_count,
+            "answer_count": len(answer_keys),
             "url_count": len(item.pop("urls")),
             "products": sorted(item.pop("products")),
             "models": sorted(item.pop("models")),
-            "coverage_rate": round(answer_count / denominator, 4) if denominator else None,
+            "coverage_rate": round(len(answer_keys & denominator_keys) / denominator, 4) if denominator else None,
         })
     domains.sort(key=lambda item: (-item["answer_count"], -item["refs"], item["domain"]))
 
@@ -458,7 +488,7 @@ def analyze(filters: dict[str, Any], allowed: list[str] | None = None) -> dict[s
             "coverage_rate": round(len(item["cited"] & product_denominator) / count, 4) if count else None,
             "official_coverage_rate": (
                 round(len(item["official"] & product_denominator) / count, 4)
-                if count and item["product_code"] in configured_official_products else None
+                if count and (official_wildcard or item["product_code"] in configured_official_products) else None
             ),
             "authority_coverage_rate": round(len(item["authority"] & product_denominator) / count, 4) if count else None,
             "domain_count": len(item["domains"]),
@@ -479,9 +509,13 @@ def analyze(filters: dict[str, Any], allowed: list[str] | None = None) -> dict[s
             reasons.append(("recommendation_without_authority", "推荐产品但缺少权威信源", "medium"))
         if (
             row["brand_recommended"]
-            and row["product_code"] in configured_official_products
+            and (official_wildcard or row["product_code"] in configured_official_products)
             and sources
-            and not any(source["is_official"] for source in sources)
+            and not any(
+                source["is_own_official"]
+                and (not source["product_codes"] or row["product_code"] in source["product_codes"])
+                for source in sources
+            )
         ):
             reasons.append(("recommendation_without_official", "推荐产品但缺少官方信源", "medium"))
         for gap_type, label, severity in reasons:
@@ -523,9 +557,14 @@ def source_answers(
     for source in sources:
         grouped[(source["dataset_id"], source["answer_id"])].append(source)
     result = []
-    for key, source_list in grouped.items():
-        row = dict(answers[key])
-        row["answer_preview"] = (row.pop("answer_text", "") or "")[:220]
+    cap = max(1, min(limit, 300))
+    # 按 _answer_rows 的 ORDER BY 顺序输出，截断结果对同一请求保持稳定。
+    for answer in answer_list:
+        key = (answer["dataset_id"], answer["answer_id"])
+        source_list = grouped.get(key)
+        if not source_list:
+            continue
+        row = dict(answer)
         row["sources"] = [
             {
                 "title": source.get("title") or "",
@@ -537,6 +576,6 @@ def source_answers(
             for source in source_list
         ]
         result.append(row)
-        if len(result) >= max(1, min(limit, 300)):
+        if len(result) >= cap:
             break
     return result

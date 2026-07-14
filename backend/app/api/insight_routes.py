@@ -27,11 +27,18 @@ def _source_filters(
     stages: str | None,
     scenarios: str | None,
 ) -> dict[str, list[Any]]:
+    mode_values = _csv_values(search_modes)
+    invalid_modes = [item for item in mode_values if item not in {"0", "1"}]
+    if invalid_modes:
+        raise HTTPException(
+            status_code=422,
+            detail=f"search_modes 仅接受 0/1，收到：{','.join(invalid_modes)}",
+        )
     return {
         "dataset_ids": _csv_values(dataset_ids),
         "product_codes": _csv_values(product_codes),
         "models": _csv_values(models),
-        "search_modes": [int(item) for item in _csv_values(search_modes) if item in {"0", "1"}],
+        "search_modes": [int(item) for item in mode_values],
         "categories": _csv_values(categories),
         "domains": _csv_values(domains),
         "stages": _csv_values(stages),

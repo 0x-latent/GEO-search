@@ -624,11 +624,18 @@ def import_yangweishu(args: argparse.Namespace) -> dict[str, Any]:
         model_key, model_name = MODEL_MAP.get(model_label, (model_label or "unknown", model_label or "unknown"))
         sources = split_sources(row.get("引用信源"))
         source_count = safe_int(row.get("信源数量"), len(sources))
+        # 优先使用表内的联网标注；缺列时才退回“有信源即联网”的推断
+        # （推断口径下联网必然带信源，信源覆盖率会被固定在 100%）。
+        search_text = clean_text(row.get("联网"))
+        search_enabled = (
+            _search_flag(search_text) == "1" if search_text
+            else source_count > 0 or bool(sources)
+        )
         response = {
             "answer": clean_text(row.get("AI回答")),
             "model": model_key,
             "model_name": model_name,
-            "search_enabled": source_count > 0 or bool(sources),
+            "search_enabled": search_enabled,
             "round": safe_int(row.get("查询轮次"), 1),
             "timestamp": iso_timestamp(row.get("查询时间")),
             "latency_ms": None,

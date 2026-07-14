@@ -17,6 +17,7 @@ services:
       - ./config/api_keys.yaml:/app/config/api_keys.yaml:ro
       - ./config/brands.yaml:/app/config/brands.yaml
       - ./config/models.yaml:/app/config/models.yaml
+      - ./config/source_domains.yaml:/app/config/source_domains.yaml
       - ./config/knowledge_base.json:/app/config/knowledge_base.json
       - ./questions:/app/questions
       - ./docs/products_db:/app/docs/products_db

@@ -11,7 +11,6 @@ import { fmtNumber, fmtRate } from "@/utils/format";
 const props = defineProps({
   fixedProductCode: { type: String, default: "" },
   initialDatasetId: { type: String, default: "" },
-  embedded: { type: Boolean, default: false },
 });
 
 const loading = ref(false);
@@ -52,14 +51,14 @@ const filterParams = computed(() => ({
   domains: csv(filters.domains),
   stages: csv(filters.stages),
 }));
+// 表格数据对应的筛选快照；下钻抽屉必须用它，不能用实时 filterParams，
+// 否则用户改了筛选未点“应用”时，抽屉查询会和表格数字对不上。
+const appliedParams = ref({});
 
 async function loadOptions() {
   optionsLoading.value = true;
   try {
     options.value = await api("/api/insight/sources/options");
-    if (props.initialDatasetId && !filters.datasetIds.length) {
-      filters.datasetIds = [props.initialDatasetId];
-    }
   } catch (error) {
     ElMessage.error(`加载信源筛选项失败：${error.message}`);
   } finally {
@@ -69,8 +68,10 @@ async function loadOptions() {
 
 async function loadAnalysis() {
   loading.value = true;
+  const params = { ...filterParams.value };
   try {
-    analysis.value = await api(`/api/insight/sources/analysis${query(filterParams.value)}`);
+    analysis.value = await api(`/api/insight/sources/analysis${query(params)}`);
+    appliedParams.value = params;
   } catch (error) {
     ElMessage.error(`加载信源分析失败：${error.message}`);
   } finally {
@@ -89,12 +90,20 @@ async function resetFilters() {
   await loadAnalysis();
 }
 
-onMounted(async () => {
-  await loadOptions();
-  await loadAnalysis();
+onMounted(() => {
+  if (props.initialDatasetId && !filters.datasetIds.length) {
+    filters.datasetIds = [props.initialDatasetId];
+  }
+  return Promise.all([loadOptions(), loadAnalysis()]);
 });
 
 watch(() => props.fixedProductCode, loadAnalysis);
+watch(() => props.initialDatasetId, (value) => {
+  if (value) {
+    filters.datasetIds = [value];
+    loadAnalysis();
+  }
+});
 
 const summary = computed(() => analysis.value?.summary || {});
 const categoryChart = computed(() => {
@@ -132,7 +141,7 @@ const severityTone = { high: "danger", medium: "warning", low: "info" };
 </script>
 
 <template>
-  <section :class="['source-panel', { embedded }]" v-loading="loading || optionsLoading">
+  <section class="source-panel" v-loading="loading || optionsLoading">
     <el-card shadow="never" class="filter-card">
       <div class="filter-grid">
         <el-select
@@ -306,7 +315,7 @@ const severityTone = { high: "danger", medium: "warning", low: "info" };
       v-model="domainDrawer.visible"
       :domain="domainDrawer.domain"
       :title="domainDrawer.title"
-      :filter-params="filterParams"
+      :filter-params="appliedParams"
     />
     <AnswerDialog
       v-model="answerDialog.visible"

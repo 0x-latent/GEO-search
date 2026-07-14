@@ -15,7 +15,7 @@ const productCode = computed(() => route.params.code);
 
 const loading = ref(true);
 const journey = ref(null);
-const activeTab = ref(String(route.query.tab || "journey"));
+const activeTab = ref(route.query.tab === "sources" ? "sources" : "journey");
 const filters = reactive({
   datasetId: String(route.query.dataset_id || ""),
   model: "",
@@ -188,7 +188,6 @@ function changeTab(name) {
           <SourceAnalysisPanel
             :fixed-product-code="productCode"
             :initial-dataset-id="filters.datasetId"
-            embedded
           />
         </el-tab-pane>
       </el-tabs>

@@ -193,7 +193,13 @@ def import_answers(args: argparse.Namespace) -> dict[str, Any]:
         round_num = _safe_int(row["查询轮次"], default=1)
         sources = _split_sources(row.get("引用信源"))
         source_count = _safe_int(row.get("信源数量"), default=len(sources))
-        search_enabled = source_count > 0 or bool(sources)
+        # 优先使用表内的联网标注；缺列时才退回“有信源即联网”的推断
+        # （推断口径下联网必然带信源，信源覆盖率会被固定在 100%）。
+        search_text = _clean_text(row.get("联网"))
+        if search_text:
+            search_enabled = search_text in {"是", "1", "True", "true"}
+        else:
+            search_enabled = source_count > 0 or bool(sources)
         search_tag = "search" if search_enabled else "nosearch"
 
         payload = {

@@ -27,6 +27,7 @@ const answerDialog = reactive({
 async function load() {
   if (!props.modelValue || !props.domain) return;
   loading.value = true;
+  rows.value = [];
   try {
     rows.value = await api(`/api/insight/sources/answers${query({
       ...props.filterParams,
