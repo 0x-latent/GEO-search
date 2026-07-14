@@ -4,11 +4,39 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
-from ..services import insight_store, product_master
+from ..services import insight_store, product_master, source_insight_store
 from .routes import _dataset_scope
 
 router = APIRouter(prefix="/api/insight")
 products_router = APIRouter(prefix="/api/products")
+
+
+def _csv_values(value: str | None) -> list[str]:
+    if not value:
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _source_filters(
+    dataset_ids: str | None,
+    product_codes: str | None,
+    models: str | None,
+    search_modes: str | None,
+    categories: str | None,
+    domains: str | None,
+    stages: str | None,
+    scenarios: str | None,
+) -> dict[str, list[Any]]:
+    return {
+        "dataset_ids": _csv_values(dataset_ids),
+        "product_codes": _csv_values(product_codes),
+        "models": _csv_values(models),
+        "search_modes": [int(item) for item in _csv_values(search_modes) if item in {"0", "1"}],
+        "categories": _csv_values(categories),
+        "domains": _csv_values(domains),
+        "stages": _csv_values(stages),
+        "scenarios": _csv_values(scenarios),
+    }
 
 
 @router.get("/products")
@@ -53,6 +81,65 @@ def get_product_trend(
         return insight_store.product_trend(product_code, metric, stage, model, search, allowed)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/sources/options")
+def get_source_options(request: Request) -> dict[str, Any]:
+    """信源工作台筛选项；只返回当前用户可见数据集中的内容。"""
+    allowed = _dataset_scope(request)
+    try:
+        return source_insight_store.list_options(allowed)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/sources/analysis")
+def get_source_analysis(
+    request: Request,
+    dataset_ids: str | None = None,
+    product_codes: str | None = None,
+    models: str | None = None,
+    search_modes: str | None = None,
+    categories: str | None = None,
+    domains: str | None = None,
+    stages: str | None = None,
+    scenarios: str | None = None,
+) -> dict[str, Any]:
+    """组合信源分析：覆盖率、分类、域名、产品对比与信源缺口。"""
+    allowed = _dataset_scope(request)
+    filters = _source_filters(
+        dataset_ids, product_codes, models, search_modes,
+        categories, domains, stages, scenarios,
+    )
+    try:
+        return source_insight_store.analyze(filters, allowed)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/sources/answers")
+def get_source_answers(
+    request: Request,
+    domain: str | None = None,
+    dataset_ids: str | None = None,
+    product_codes: str | None = None,
+    models: str | None = None,
+    search_modes: str | None = None,
+    categories: str | None = None,
+    stages: str | None = None,
+    scenarios: str | None = None,
+    limit: int = 100,
+) -> list[dict[str, Any]]:
+    """域名/分类 → 回答明细，供信源排行下钻。"""
+    allowed = _dataset_scope(request)
+    filters = _source_filters(
+        dataset_ids, product_codes, models, search_modes,
+        categories, None, stages, scenarios,
+    )
+    try:
+        return source_insight_store.source_answers(filters, domain, limit, allowed)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

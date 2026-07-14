@@ -6,6 +6,7 @@ import { ElMessage } from "element-plus";
 import { api, query } from "@/api/client";
 import EvidenceDrawer from "@/components/product/EvidenceDrawer.vue";
 import StageSection from "@/components/product/StageSection.vue";
+import SourceAnalysisPanel from "@/components/source/SourceAnalysisPanel.vue";
 import { SEARCH_LABELS, fmtNumber, fmtRate } from "@/utils/format";
 
 const route = useRoute();
@@ -14,6 +15,7 @@ const productCode = computed(() => route.params.code);
 
 const loading = ref(true);
 const journey = ref(null);
+const activeTab = ref(String(route.query.tab || "journey"));
 const filters = reactive({
   datasetId: String(route.query.dataset_id || ""),
   model: "",
@@ -68,6 +70,17 @@ function openEvidence({ type, stage }) {
   drawer.title = journey.value?.product_name || "";
   drawer.visible = true;
 }
+
+function changeTab(name) {
+  activeTab.value = name;
+  router.replace({
+    query: {
+      ...route.query,
+      tab: name === "sources" ? "sources" : undefined,
+      dataset_id: filters.datasetId || undefined,
+    },
+  });
+}
 </script>
 
 <template>
@@ -80,9 +93,9 @@ function openEvidence({ type, stage }) {
             {{ journey.product_name }}
             <el-tag v-if="journey.category" size="small" effect="plain">{{ journey.category }}</el-tag>
           </h1>
-          <p>消费者搜索链路三阶段分析 · 数据批次可切换，趋势基于相同问题集的批次序列。</p>
+          <p>{{ activeTab === "sources" ? "查看该产品被 AI 引用的来源结构、域名排行和信源缺口。" : "消费者搜索链路三阶段分析 · 数据批次可切换，趋势基于相同问题集的批次序列。" }}</p>
         </div>
-        <el-space wrap>
+        <el-space v-if="activeTab === 'journey'" wrap>
           <el-select v-model="filters.datasetId" placeholder="批次" style="width: 230px">
             <el-option
               v-for="batch in journey.batches"
@@ -110,71 +123,75 @@ function openEvidence({ type, stage }) {
         </el-space>
       </div>
 
-      <el-empty v-if="!journey.batches.length" description="该产品还没有分析数据">
-        <el-button type="primary" @click="router.push('/analysis')">去发起分析</el-button>
-      </el-empty>
+      <el-tabs v-model="activeTab" class="product-tabs" @tab-change="changeTab">
+        <el-tab-pane label="产品旅程" name="journey">
+          <el-empty v-if="!journey.batches.length" description="该产品还没有分析数据">
+            <el-button type="primary" @click="router.push('/analysis')">去发起分析</el-button>
+          </el-empty>
 
-      <template v-else>
-        <StageSection
-          v-for="stage in ['symptom', 'category', 'brand']"
-          :key="stage"
-          :stage="stage"
-          :data="journey.stages[stage]"
-          :product-name="journey.product_name"
-          @open-evidence="openEvidence"
-        />
+          <template v-else>
+            <StageSection
+              v-for="stage in ['symptom', 'category', 'brand']"
+              :key="stage"
+              :stage="stage"
+              :data="journey.stages[stage]"
+              :product-name="journey.product_name"
+              @open-evidence="openEvidence"
+            />
 
-        <el-card v-if="journey.scenarios?.length" class="scenario-card" shadow="never">
-          <div class="scenario-head">
-            <div>
-              <h2>场景拆解</h2>
-              <p class="muted">
-                同一消费场景（如"吃辣胃痛"）下多个问题的汇总表现——三阶段之外的横向视角，
-                回答"在这个具体场景里我们被推荐了吗"。
-              </p>
-            </div>
-          </div>
-          <el-table :data="journey.scenarios" size="small" :default-sort="{ prop: 'brand_mention_rate', order: 'descending' }">
-            <el-table-column prop="scenario" label="场景" min-width="150" />
-            <el-table-column label="问题数" width="80">
-              <template #default="{ row }">{{ fmtNumber(row.question_count) }}</template>
-            </el-table-column>
-            <el-table-column label="回答样本" width="90">
-              <template #default="{ row }">{{ fmtNumber(row.total_answers) }}</template>
-            </el-table-column>
-            <el-table-column prop="brand_mention_rate" label="品牌提及/能见度" width="140" sortable>
-              <template #default="{ row }">
-                <b>{{ fmtRate(row.brand_mention_rate) }}</b>
-              </template>
-            </el-table-column>
-            <el-table-column label="品牌推荐/前三率" width="140">
-              <template #default="{ row }">{{ fmtRate(row.brand_rec_rate) }}</template>
-            </el-table-column>
-            <el-table-column label="我方负面" width="90">
-              <template #default="{ row }">
-                <span :style="row.negative_count ? 'color:#b91c1c;font-weight:600' : ''">
-                  {{ row.negative_count ?? "—" }}
-                </span>
-              </template>
-            </el-table-column>
-            <el-table-column label="AI 推荐的品类" min-width="180">
-              <template #default="{ row }">
-                <el-tag v-for="cat in row.top_categories" :key="cat.category" size="small" effect="plain" style="margin-right: 4px">
-                  {{ cat.category }}
-                </el-tag>
-                <span v-if="!row.top_categories?.length" class="muted">—</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="" width="90">
-              <template #default="{ row }">
-                <el-button link type="primary" size="small" @click="openScenarioEvidence(row)">
-                  查看证据
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
-      </template>
+            <el-card v-if="journey.scenarios?.length" class="scenario-card" shadow="never">
+              <div class="scenario-head">
+                <div>
+                  <h2>场景拆解</h2>
+                  <p class="muted">
+                    同一消费场景（如"吃辣胃痛"）下多个问题的汇总表现——三阶段之外的横向视角，
+                    回答"在这个具体场景里我们被推荐了吗"。
+                  </p>
+                </div>
+              </div>
+              <el-table :data="journey.scenarios" size="small" :default-sort="{ prop: 'brand_mention_rate', order: 'descending' }">
+                <el-table-column prop="scenario" label="场景" min-width="150" />
+                <el-table-column label="问题数" width="80">
+                  <template #default="{ row }">{{ fmtNumber(row.question_count) }}</template>
+                </el-table-column>
+                <el-table-column label="回答样本" width="90">
+                  <template #default="{ row }">{{ fmtNumber(row.total_answers) }}</template>
+                </el-table-column>
+                <el-table-column prop="brand_mention_rate" label="品牌提及/能见度" width="140" sortable>
+                  <template #default="{ row }"><b>{{ fmtRate(row.brand_mention_rate) }}</b></template>
+                </el-table-column>
+                <el-table-column label="品牌推荐/前三率" width="140">
+                  <template #default="{ row }">{{ fmtRate(row.brand_rec_rate) }}</template>
+                </el-table-column>
+                <el-table-column label="我方负面" width="90">
+                  <template #default="{ row }">
+                    <span :style="row.negative_count ? 'color:#b91c1c;font-weight:600' : ''">{{ row.negative_count ?? "—" }}</span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="AI 推荐的品类" min-width="180">
+                  <template #default="{ row }">
+                    <el-tag v-for="cat in row.top_categories" :key="cat.category" size="small" effect="plain" style="margin-right: 4px">{{ cat.category }}</el-tag>
+                    <span v-if="!row.top_categories?.length" class="muted">—</span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="" width="90">
+                  <template #default="{ row }">
+                    <el-button link type="primary" size="small" @click="openScenarioEvidence(row)">查看证据</el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </el-card>
+          </template>
+        </el-tab-pane>
+
+        <el-tab-pane label="信源分析" name="sources" lazy>
+          <SourceAnalysisPanel
+            :fixed-product-code="productCode"
+            :initial-dataset-id="filters.datasetId"
+            embedded
+          />
+        </el-tab-pane>
+      </el-tabs>
 
       <EvidenceDrawer
         v-model="drawer.visible"

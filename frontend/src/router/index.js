@@ -21,6 +21,12 @@ const router = createRouter({
       meta: { title: "产品详情" },
     },
     {
+      path: "/sources",
+      name: "sources",
+      component: () => import("@/views/SourceAnalysis.vue"),
+      meta: { title: "信源分析" },
+    },
+    {
       path: "/analysis",
       name: "analysis",
       component: () => import("@/views/MyAnalysis.vue"),

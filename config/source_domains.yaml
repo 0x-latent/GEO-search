@@ -1,0 +1,107 @@
+# 信源域名分类目录。
+#
+# 匹配顺序：domain_overrides（精确）→ suffix_rules（后缀）→ keyword_rules（关键词）→ other。
+# domain 使用规范域名（系统会自动去除 www/m/mip/wap/amp 等展示型子域）。
+# ownership 可选：owned / competitor / third_party。
+# product_codes 可选：当 ownership 为 owned/competitor 时标记关联产品。
+
+categories:
+  regulator: 监管/政府
+  medical_institution: 医疗机构
+  academic: 学术/专业
+  medical_portal: 医疗科普/问答
+  news: 新闻出版
+  ugc: UGC/社区
+  ecommerce: 电商/药品平台
+  brand_official: 品牌官方
+  competitor_official: 竞品官方
+  other: 其他
+
+domain_overrides:
+  nmpa.gov.cn:
+    name: 国家药品监督管理局
+    category: regulator
+    authority: A
+  nhc.gov.cn:
+    name: 国家卫生健康委员会
+    category: regulator
+    authority: A
+  mayoclinic.org:
+    name: Mayo Clinic
+    category: medical_institution
+    authority: A
+  pubmed.ncbi.nlm.nih.gov:
+    name: PubMed
+    category: academic
+    authority: A
+  ncbi.nlm.nih.gov:
+    name: NCBI
+    category: academic
+    authority: A
+  drugs.dxy.cn:
+    name: 丁香园用药助手
+    category: academic
+    authority: B
+  bohe.cn:
+    name: 博禾医生
+    category: medical_portal
+    authority: B
+  mfk.com:
+    name: 民福康
+    category: medical_portal
+    authority: B
+  dayi.org.cn:
+    name: 大医网
+    category: medical_portal
+    authority: B
+  youlai.cn:
+    name: 有来医生
+    category: medical_portal
+    authority: B
+  health.baidu.com:
+    name: 百度健康
+    category: medical_portal
+    authority: B
+  baike.baidu.com:
+    name: 百度百科
+    category: medical_portal
+    authority: C
+  zhihu.com:
+    name: 知乎
+    category: ugc
+    authority: C
+  mp.weixin.qq.com:
+    name: 微信公众号
+    category: ugc
+    authority: C
+
+suffix_rules:
+  - suffix: gov.cn
+    category: regulator
+    authority: A
+  - suffix: edu.cn
+    category: academic
+    authority: A
+  - suffix: ac.cn
+    category: academic
+    authority: A
+
+keyword_rules:
+  - keywords: [hospital, clinic, hosp]
+    category: medical_institution
+    authority: A
+  - keywords: [pubmed, ncbi, cnki, wanfang, medline, who.int]
+    category: academic
+    authority: A
+  - keywords: [health, doctor, yisheng, yiyao, yaopin, ypk, fh21, 39.net, xiaohe]
+    category: medical_portal
+    authority: B
+  - keywords: [news, xinhuanet, people.com, sohu.com, sina.com, 163.com, qq.com, thepaper]
+    category: news
+    authority: B
+  - keywords: [zhihu, weibo, xiaohongshu, tieba, douban, reddit, weixin]
+    category: ugc
+    authority: C
+  - keywords: [jd.com, tmall, taobao, 360kad, yaofang, pharmacy, mall]
+    category: ecommerce
+    authority: C

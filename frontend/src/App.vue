@@ -11,6 +11,7 @@ const router = useRouter();
 const navItems = computed(() => {
   const items = [
     { path: "/overview", label: "品牌总览", icon: "📊" },
+    { path: "/sources", label: "信源分析", icon: "🔗" },
     { path: "/analysis", label: "我的分析", icon: "🧪" },
     { path: "/settings", label: "我的配置", icon: "⚙️" },
   ];

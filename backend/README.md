@@ -35,6 +35,7 @@ collect(03) → analyze(04) → extract(05, 含负面情感) → verify(07, 准�
 - `/api/insight/products/{code}/journey`：三阶段详情
 - `/api/insight/products/{code}/trend`：跨批次趋势（同问题集指纹才可比）
 - `/api/insight/evidence` + `/api/insight/answers/...`：证据链下钻到 AI 原文
+- `/api/insight/sources/options|analysis|answers`：信源分类、任意产品组合分析与域名下钻；域名分类目录位于 `config/source_domains.yaml`
 - `/api/sqlite/*`：工作台明细；`/api/jobs*`：任务；`/api/auth/*`、`/api/config/*`
 
 ## Docker
