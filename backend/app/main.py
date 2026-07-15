@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .api.auth_routes import SESSION_COOKIE, router as auth_router
 from .api.config_routes import router as config_router
+from .api.contributor_routes import router as contributor_router
 from .api.insight_routes import products_router, router as insight_router
 from .api.job_routes import router as job_router, template_router
 from .api.kb_import_routes import router as kb_import_router
@@ -36,7 +37,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-PUBLIC_PATHS = {"/login.html", "/api/auth/login", "/api/health", "/favicon.ico"}
+PUBLIC_PATHS = {"/login.html", "/article-submit.html", "/api/auth/login", "/api/health", "/favicon.ico"}
 
 # 门户统一登录（portal SSO）：仅当前置网关携带正确的共享密钥时，
 # 才信任其注入的 X-Portal-User / X-Portal-Role 身份头。
@@ -60,7 +61,7 @@ def _portal_user(request: Request) -> dict | None:
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
-    if path in PUBLIC_PATHS:
+    if path in PUBLIC_PATHS or path.startswith("/api/contributor/") or path.startswith("/assets/"):
         response = await call_next(request)
     else:
         user = _portal_user(request) or auth_store.get_session_user(
@@ -84,6 +85,7 @@ async def auth_middleware(request: Request, call_next):
 
 app.include_router(auth_router)
 app.include_router(config_router)
+app.include_router(contributor_router)
 app.include_router(insight_router)
 app.include_router(products_router)
 app.include_router(job_router)

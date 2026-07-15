@@ -2,9 +2,12 @@
 import { ref } from "vue";
 
 import OutboundArticlePanel from "@/components/source/OutboundArticlePanel.vue";
+import ContributorReviewPanel from "@/components/source/ContributorReviewPanel.vue";
 import SourceAnalysisPanel from "@/components/source/SourceAnalysisPanel.vue";
+import { useSessionStore } from "@/stores/session";
 
 const activeTab = ref("sources");
+const session = useSessionStore();
 </script>
 
 <template>
@@ -16,6 +19,7 @@ const activeTab = ref("sources");
     <el-tabs v-model="activeTab" class="source-workspace-tabs">
       <el-tab-pane label="信源结构分析" name="sources"><SourceAnalysisPanel /></el-tab-pane>
       <el-tab-pane label="外发文章追踪" name="articles" lazy><OutboundArticlePanel /></el-tab-pane>
+      <el-tab-pane v-if="session.isAdmin" label="外部投稿审核" name="submissions" lazy><ContributorReviewPanel /></el-tab-pane>
     </el-tabs>
   </div>
 </template>

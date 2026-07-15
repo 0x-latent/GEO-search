@@ -6,6 +6,7 @@ import { api, apiJson, appUrl } from "@/api/client";
 import BrandsEditor from "@/components/config/BrandsEditor.vue";
 import KbEditor from "@/components/config/KbEditor.vue";
 import KbImportPanel from "@/components/config/KbImportPanel.vue";
+import ReviewSettingsPanel from "@/components/config/ReviewSettingsPanel.vue";
 import { useSessionStore } from "@/stores/session";
 
 const session = useSessionStore();
@@ -150,6 +151,9 @@ function switchScope(value) {
     </el-space>
 
     <el-tabs v-model="activeTab">
+      <el-tab-pane v-if="session.isAdmin" label="AI 审稿设置" name="article-review" lazy>
+        <ReviewSettingsPanel />
+      </el-tab-pane>
       <el-tab-pane label="品牌与竞品" name="brands">
         <el-card shadow="never">
           <BrandsEditor v-if="brandsData" ref="brandsEditor" :data="brandsData" />

@@ -22,5 +22,11 @@ export default defineConfig({
     outDir: "../backend/app/static",
     emptyOutDir: true,
     chunkSizeWarningLimit: 1500,
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL("./index.html", import.meta.url)),
+        contributor: fileURLToPath(new URL("./article-submit.html", import.meta.url)),
+      },
+    },
   },
 });

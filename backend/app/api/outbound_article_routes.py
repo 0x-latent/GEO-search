@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
 from ..services import outbound_article_store
+from ..services.document_extract import MAX_FILE_BYTES
 from .auth_routes import _current_user
 from .routes import _dataset_scope
 
@@ -35,7 +36,7 @@ async def import_article(
 ) -> dict[str, Any]:
     """导入一篇外发文章及其发布记录（MD / TXT / DOCX / PDF）。"""
     user = _current_user(request)
-    content = await file.read()
+    content = await file.read(MAX_FILE_BYTES + 1)
     try:
         article = outbound_article_store.create_article(
             username=user["username"], filename=file.filename or "article",
