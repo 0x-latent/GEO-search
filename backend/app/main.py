@@ -13,6 +13,7 @@ from .api.config_routes import router as config_router
 from .api.insight_routes import products_router, router as insight_router
 from .api.job_routes import router as job_router, template_router
 from .api.kb_import_routes import router as kb_import_router
+from .api.outbound_article_routes import router as outbound_article_router
 from .api.routes import router
 from .core.paths import APP_DIR
 from .services import auth_store, job_store, kb_import_store, product_master
@@ -88,5 +89,6 @@ app.include_router(products_router)
 app.include_router(job_router)
 app.include_router(template_router)
 app.include_router(kb_import_router)
+app.include_router(outbound_article_router)
 app.include_router(router)
 app.mount("/", StaticFiles(directory=APP_DIR / "static", html=True), name="static")

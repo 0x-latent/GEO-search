@@ -141,6 +141,58 @@ CREATE INDEX IF NOT EXISTS idx_sources_domain
     ON sources(dataset_id, domain);
 CREATE INDEX IF NOT EXISTS idx_external_tables_dataset
     ON external_tables(dataset_id, table_name);
+
+CREATE TABLE IF NOT EXISTS outbound_articles (
+    article_id TEXT PRIMARY KEY,
+    owner_username TEXT NOT NULL,
+    title TEXT NOT NULL,
+    content_text TEXT NOT NULL,
+    content_sha256 TEXT NOT NULL,
+    product_code TEXT,
+    campaign TEXT,
+    source_filename TEXT NOT NULL,
+    file_ext TEXT NOT NULL,
+    file_sha256 TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    metadata_json TEXT NOT NULL DEFAULT '{}'
+);
+
+CREATE TABLE IF NOT EXISTS article_publications (
+    publication_id TEXT PRIMARY KEY,
+    article_id TEXT NOT NULL,
+    platform TEXT NOT NULL,
+    url TEXT NOT NULL,
+    canonical_url TEXT NOT NULL,
+    url_match_key TEXT NOT NULL,
+    published_at TEXT,
+    created_at TEXT NOT NULL,
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    UNIQUE (article_id, url_match_key),
+    FOREIGN KEY (article_id) REFERENCES outbound_articles(article_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS source_article_matches (
+    dataset_id TEXT NOT NULL,
+    answer_id TEXT NOT NULL,
+    source_index INTEGER NOT NULL,
+    publication_id TEXT NOT NULL,
+    match_method TEXT NOT NULL,
+    confidence REAL NOT NULL,
+    matched_at TEXT NOT NULL,
+    evidence_json TEXT NOT NULL DEFAULT '{}',
+    PRIMARY KEY (dataset_id, answer_id, source_index, publication_id),
+    FOREIGN KEY (dataset_id, answer_id, source_index)
+        REFERENCES sources(dataset_id, answer_id, source_index) ON DELETE CASCADE,
+    FOREIGN KEY (publication_id) REFERENCES article_publications(publication_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_outbound_articles_owner
+    ON outbound_articles(owner_username, created_at);
+CREATE INDEX IF NOT EXISTS idx_article_publications_url
+    ON article_publications(url_match_key);
+CREATE INDEX IF NOT EXISTS idx_source_article_matches_publication
+    ON source_article_matches(publication_id, dataset_id, answer_id);
 """
 
 # ---------------------------------------------------------------------------

@@ -1,13 +1,25 @@
 <script setup>
+import { ref } from "vue";
+
+import OutboundArticlePanel from "@/components/source/OutboundArticlePanel.vue";
 import SourceAnalysisPanel from "@/components/source/SourceAnalysisPanel.vue";
+
+const activeTab = ref("sources");
 </script>
 
 <template>
   <div class="page">
     <div class="page-header">
       <h1>信源分析</h1>
-      <p>组合数据集、产品、模型和信源分类，查看 AI 回答依赖的域名、来源结构与信源缺口。</p>
+      <p>分析 AI 回答的来源结构，并追踪对外发布文章是否进入新一轮 AI 信源。</p>
     </div>
-    <SourceAnalysisPanel />
+    <el-tabs v-model="activeTab" class="source-workspace-tabs">
+      <el-tab-pane label="信源结构分析" name="sources"><SourceAnalysisPanel /></el-tab-pane>
+      <el-tab-pane label="外发文章追踪" name="articles" lazy><OutboundArticlePanel /></el-tab-pane>
+    </el-tabs>
   </div>
 </template>
+
+<style scoped>
+.source-workspace-tabs :deep(> .el-tabs__header) { margin-bottom: 16px; }
+</style>
