@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@cr999ai/ui-vue": "file:vendor/cr999ai-ui-vue-0.1.1.tgz",
+    "@cr999ai/ui-vue": "file:vendor/cr999ai-ui-vue-0.2.0.tgz",
     "echarts": "^5.5.1",
     "element-plus": "^2.8.8",
     "pinia": "^2.2.6",
