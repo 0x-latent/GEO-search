@@ -12,12 +12,19 @@ from .api.auth_routes import SESSION_COOKIE, router as auth_router
 from .api.config_routes import router as config_router
 from .api.contributor_routes import router as contributor_router
 from .api.insight_routes import products_router, router as insight_router
+from .api.investigation_routes import router as investigation_router
 from .api.job_routes import router as job_router, template_router
 from .api.kb_import_routes import router as kb_import_router
 from .api.outbound_article_routes import router as outbound_article_router
 from .api.routes import router
 from .core.paths import APP_DIR
-from .services import auth_store, job_store, kb_import_store, product_master
+from .services import (
+    auth_store,
+    investigation_store,
+    job_store,
+    kb_import_store,
+    product_master,
+)
 
 app = FastAPI(title="GEO Search Workbench", version="0.1.0")
 
@@ -26,6 +33,8 @@ auth_store.init_db()
 product_master.ensure_geo_schema()
 product_master.sync_products_from_brands()
 job_store.init_db()
+investigation_store.init_db()
+investigation_store.ensure_worker()
 job_store.ensure_worker()
 kb_import_store.init_db()
 kb_import_store.ensure_worker()
@@ -87,6 +96,7 @@ app.include_router(auth_router)
 app.include_router(config_router)
 app.include_router(contributor_router)
 app.include_router(insight_router)
+app.include_router(investigation_router)
 app.include_router(products_router)
 app.include_router(job_router)
 app.include_router(template_router)

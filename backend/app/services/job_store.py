@@ -454,3 +454,19 @@ def _run_job(job_id: str) -> None:
         return
 
     _update_job(job_id, status="success", stage="done", finished_at=_now())
+
+    # 调查扫描不反向影响数据采集任务成功状态。没有可比基线是正常情况；
+    # 扫描异常只记录到 job 日志，用户仍可通过 API 手动发起调查。
+    try:
+        from . import investigation_store
+        scan = investigation_store.scan_dataset(
+            job["dataset_id"], owner_username=job["username"]
+        )
+        with log_path.open("a", encoding="utf-8") as log:
+            log.write(
+                f"\n[investigation] scan={scan['scan_id']} "
+                f"candidates={scan['candidate_count']}\n"
+            )
+    except Exception as exc:  # noqa: BLE001 - 调查是非阻塞后处理
+        with log_path.open("a", encoding="utf-8") as log:
+            log.write(f"\n[investigation] 自动扫描跳过/失败: {exc}\n")

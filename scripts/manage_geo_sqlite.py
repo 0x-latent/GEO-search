@@ -284,15 +284,25 @@ def insert_answer(
         if url or title:
             sources.append({"title": title, "url": url})
     source_count = safe_int(response.get("source_count"), len(sources)) or len(sources)
+    answer_metadata = dict(metadata or {})
+    if response.get("collector_version"):
+        answer_metadata["collector_version"] = response["collector_version"]
+    raw_response_sha256 = clean_text(response.get("raw_response_sha256"))
+    if not raw_response_sha256 and response.get("raw_response") is not None:
+        raw_response_sha256 = hashlib.sha256(
+            json_dumps(response["raw_response"]).encode("utf-8")
+        ).hexdigest()
 
     conn.execute(
         """
         INSERT OR REPLACE INTO answers (
             dataset_id, answer_id, question_id, product_code, product_name,
-            model, model_name, search_enabled, round, timestamp, answer_text,
-            answer_chars, latency_ms, source_count, raw_path, metadata_json
+            model, model_name, model_id, search_enabled, search_triggered,
+            round, timestamp, answer_text, answer_chars, latency_ms,
+            source_count, raw_path, route, client_mode, request_config_json,
+            raw_response_sha256, metadata_json
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             dataset_id,
@@ -302,7 +312,12 @@ def insert_answer(
             clean_text(q.get("product")),
             model,
             model_name,
+            clean_text(response.get("model_id")),
             search_enabled,
+            (
+                1 if response.get("search_triggered") else 0
+                if response.get("search_triggered") is not None else None
+            ),
             round_num,
             clean_text(response.get("timestamp")),
             answer_text,
@@ -310,7 +325,11 @@ def insert_answer(
             response.get("latency_ms"),
             source_count,
             raw_path,
-            json_dumps(metadata or {}),
+            clean_text(response.get("route")),
+            clean_text(response.get("client_mode")) or "api",
+            json_dumps(response.get("request_config") or {}),
+            raw_response_sha256,
+            json_dumps(answer_metadata),
         ),
     )
 

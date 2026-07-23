@@ -6,12 +6,24 @@
 - 腾讯云原生API：混元（使用SecretId+SecretKey签名认证）
 """
 import asyncio
+import hashlib
 import json
 import time
 import logging
 from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
+
+
+def _response_sha256(value: object) -> str:
+    try:
+        payload = json.dumps(
+            value, ensure_ascii=False, sort_keys=True, default=str,
+            separators=(",", ":"),
+        )
+    except Exception:
+        payload = str(value)
+    return hashlib.sha256(payload.encode("utf-8", errors="replace")).hexdigest()
 
 
 def resolve_relay(models_config: dict, keys: dict) -> dict | None:
@@ -174,8 +186,18 @@ class ModelClient:
                 "sources": sources,
                 "model": self.model_key,
                 "model_name": self.name,
+                "model_id": self.model_id,
                 "latency_ms": latency_ms,
                 "search_enabled": enable_search,
+                "search_triggered": bool(search_results),
+                "route": self.route,
+                "client_mode": "api",
+                "request_config": {
+                    "api": "tencent_cloud",
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                },
+                "raw_response_sha256": _response_sha256(raw),
                 "raw_response": raw,
             }
         except Exception as e:
@@ -216,8 +238,19 @@ class ModelClient:
                 "sources": sources,
                 "model": self.model_key,
                 "model_name": self.name,
+                "model_id": self.model_id,
                 "latency_ms": latency_ms,
                 "search_enabled": enable_search,
+                "search_triggered": bool(sources) if enable_search else False,
+                "route": self.route,
+                "client_mode": "api",
+                "request_config": {
+                    "api": "chat_completions",
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                    "json_mode": bool(json_mode),
+                },
+                "raw_response_sha256": _response_sha256(response.model_dump()),
                 "raw_response": response.model_dump(),
             }
         except Exception as e:
@@ -274,8 +307,19 @@ class ModelClient:
                 "sources": sources,
                 "model": self.model_key,
                 "model_name": self.name,
+                "model_id": self.search_model_id,
                 "latency_ms": latency_ms,
-                "search_enabled": True,
+                "search_enabled": enable_search,
+                "search_triggered": bool(sources) if enable_search else False,
+                "route": self.route,
+                "client_mode": "api",
+                "request_config": {
+                    "api": "responses",
+                    "requested_temperature": temperature,
+                    "requested_max_tokens": max_tokens,
+                    "tools_enabled": bool(enable_search),
+                },
+                "raw_response_sha256": _response_sha256(raw),
                 "raw_response": raw,
             }
         except Exception as e:

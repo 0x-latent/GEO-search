@@ -212,6 +212,7 @@ async def execute_single_query(
             result["product"] = question["product"]
             result["round"] = round_num
             result["timestamp"] = datetime.now().isoformat()
+            result["collector_version"] = "query-models-v2-observable"
 
             fname = result_filename(question["id"], round_num, search_enabled)
             fpath = os.path.join(model_dir, fname)
