@@ -231,7 +231,7 @@ const evidenceButtons = computed(() => {
 }
 .chart-title {
   font-size: 13px;
-  color: var(--geo-muted);
+  color: var(--ds-text-3);
   margin: 4px 0 8px;
   font-weight: 500;
 }

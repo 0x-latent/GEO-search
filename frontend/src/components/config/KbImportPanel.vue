@@ -344,7 +344,7 @@ async function applyReview() {
 }
 .pane-label {
   font-size: 12px;
-  color: var(--geo-muted);
+  color: var(--ds-text-3);
   margin-bottom: 4px;
 }
 .current-text {
@@ -360,7 +360,7 @@ async function applyReview() {
 .quotes {
   margin-top: 8px;
   font-size: 12px;
-  color: var(--geo-muted);
+  color: var(--ds-text-3);
 }
 .quotes ul {
   margin: 6px 0 0;

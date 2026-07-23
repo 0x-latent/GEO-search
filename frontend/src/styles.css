@@ -1,15 +1,11 @@
-:root {
-  --geo-teal: #0f766e;
-  --geo-ink: #1f2933;
-  --geo-muted: #66717d;
-  --geo-bg: #f5f6f8;
-}
+/* 全局样式:颜色/字体一律走设计系统 token(--ds-*,见 @cr999ai/ui-vue/tokens.css),
+ * 不再维护本地 --geo-* 变量。 */
 
 body {
   margin: 0;
-  background: var(--geo-bg);
-  color: var(--geo-ink);
-  font-family: "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+  background: var(--ds-bg-page);
+  color: var(--ds-text-1);
+  font-family: var(--ds-font-family);
 }
 
 .page {
@@ -23,14 +19,14 @@ body {
 }
 
 .page-header h1 {
-  font-size: 20px;
+  font-size: var(--ds-text-xl);
   margin: 0 0 4px;
 }
 
 .page-header p {
   margin: 0;
-  color: var(--geo-muted);
-  font-size: 13px;
+  color: var(--ds-text-3);
+  font-size: var(--ds-text-sm);
 }
 
 .metric-value {
@@ -40,18 +36,18 @@ body {
 }
 
 .metric-label {
-  font-size: 12px;
-  color: var(--geo-muted);
+  font-size: var(--ds-text-xs);
+  color: var(--ds-text-3);
 }
 
 .muted {
-  color: var(--geo-muted);
+  color: var(--ds-text-3);
 }
 
 .answer-text {
   white-space: pre-wrap;
   line-height: 1.7;
-  font-size: 14px;
+  font-size: var(--ds-text-md);
   max-height: 55vh;
   overflow-y: auto;
   padding-right: 8px;

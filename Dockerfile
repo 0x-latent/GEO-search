@@ -1,18 +1,24 @@
 # 基础镜像可用 build args 覆盖（国内服务器 docker.io 受限时指向镜像源，
 # 见 docs/docker部署说明.md 的 docker-compose.override.yml 示例）
-ARG NODE_IMAGE=node:20-slim
+# Vite 8 要求 Node ^20.19 或 >=22.12，用 22 保证余量
+ARG NODE_IMAGE=node:22-slim
 ARG PYTHON_IMAGE=python:3.11-slim
 
-# ---- 前端构建阶段：Vue 3 + Vite，产物拷入 FastAPI 静态目录 ----
+# ---- 前端构建阶段：Vue 3 + Vite 8 + pnpm，产物拷入 FastAPI 静态目录 ----
 FROM ${NODE_IMAGE} AS webbuild
 
 WORKDIR /web
-COPY frontend/package.json frontend/package-lock.json* ./
-RUN npm config set registry https://registry.npmmirror.com \
-    && npm install --no-audit --no-fund
+# corepack 下载 pnpm 也走国内镜像
+ENV COREPACK_NPM_REGISTRY=https://registry.npmmirror.com
+RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
+# vendor/ 内是共享包 tgz（file: 依赖），必须先于 install 进入镜像
+COPY frontend/package.json frontend/pnpm-lock.yaml ./
+COPY frontend/vendor ./vendor
+RUN pnpm config set registry https://registry.npmmirror.com \
+    && pnpm install --frozen-lockfile
 COPY frontend/ ./
 # vite.config 默认输出到 ../backend/app/static，容器内改为本地 dist
-RUN npm run build -- --outDir /web/dist --emptyOutDir
+RUN pnpm build --outDir /web/dist --emptyOutDir
 
 # ---- 运行阶段 ----
 FROM ${PYTHON_IMAGE}
