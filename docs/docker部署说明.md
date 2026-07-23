@@ -71,20 +71,22 @@ cp config/api_keys.yaml.example config/api_keys.yaml
 
 ## 推送阿里云 ACR
 
-示例：
+生产仓库为 ACR 企业基础版实例（2026-07 起），命名空间 `cr999ai`，仅公网入口（未开 PrivateZone/VPC 域名），tag 用完整 commit SHA：
 
 ```bash
-docker login registry.cn-hangzhou.aliyuncs.com
-docker tag geo-search-workbench:latest registry.cn-hangzhou.aliyuncs.com/<namespace>/geo-search-workbench:<tag>
-docker push registry.cn-hangzhou.aliyuncs.com/<namespace>/geo-search-workbench:<tag>
+docker login --username=999ai cr999ai-registry.cn-shenzhen.cr.aliyuncs.com
+docker tag geo-search-workbench:latest cr999ai-registry.cn-shenzhen.cr.aliyuncs.com/cr999ai/geo-search:<commit-sha>
+docker push cr999ai-registry.cn-shenzhen.cr.aliyuncs.com/cr999ai/geo-search:<commit-sha>
 ```
 
-ECS 上拉取并启动：
+ECS 上拉取并启动（`.env` 的 `GEO_IMAGE` 指向同一 tag）：
 
 ```bash
-docker pull registry.cn-hangzhou.aliyuncs.com/<namespace>/geo-search-workbench:<tag>
+docker pull cr999ai-registry.cn-shenzhen.cr.aliyuncs.com/cr999ai/geo-search:<commit-sha>
 docker compose up -d
 ```
+
+> 旧个人版仓库 `crpi-5c3cvh7cf04avg4p.cn-shenzhen.personal.cr.aliyuncs.com/financial-analyzer/geo-search` 挂在旧阿里云账号下，已停止使用，勿再推送。
 
 ## 升级部署注意（v2 业务化改版）
 

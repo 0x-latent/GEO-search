@@ -3,7 +3,7 @@
 生产环境的 Web 与 Worker 使用同一个 ACR 镜像，不在 ECS 上构建：
 
 ```env
-GEO_IMAGE=crpi-5c3cvh7cf04avg4p.cn-shenzhen.personal.cr.aliyuncs.com/financial-analyzer/geo-search:<commit>
+GEO_IMAGE=cr999ai-registry.cn-shenzhen.cr.aliyuncs.com/cr999ai/geo-search:<commit>
 GEO_ARTICLE_REVIEW_CONCURRENCY_MAX=5
 GEO_ARTICLE_REVIEW_MEMORY_LIMIT=512m
 ```
