@@ -8,6 +8,7 @@
 import asyncio
 import hashlib
 import json
+import os
 import time
 import logging
 from openai import AsyncOpenAI
@@ -27,12 +28,26 @@ def _response_sha256(value: object) -> str:
 
 
 def resolve_relay(models_config: dict, keys: dict) -> dict | None:
-    """从 models.yaml 的 relay 段和 api_keys.yaml 的 relay key 组装中继配置。
+    """从环境变量 / models.yaml 的 relay 段 / api_keys.yaml 的 relay key 组装中继配置。
 
     返回 {"base_url", "api_key"}；base_url 或 key 缺失时返回 None（回退直连）。
+
+    **网关地址与令牌优先取环境变量**（`AGENT_GATEWAY_BASE_URL` / `AGENT_GATEWAY_API_KEY`，
+    兼容 `NEWAPI_*` 别名）。配置文件中的值仅作兜底：models.yaml 是提交进版本库的，
+    把真实网关地址写在那里会随仓库一起流出；换网关时也得改代码库再部署，
+    而环境变量改一处、重启即可。
     """
     relay = dict(models_config.get("relay") or {})
-    key = (keys.get("relay") or {}).get("api_key", "")
+
+    env_base = (os.environ.get("AGENT_GATEWAY_BASE_URL")
+                or os.environ.get("NEWAPI_BASE_URL") or "").strip()
+    if env_base:
+        relay["base_url"] = env_base
+
+    env_key = (os.environ.get("AGENT_GATEWAY_API_KEY")
+               or os.environ.get("NEWAPI_API_KEY") or "").strip()
+    key = env_key or (keys.get("relay") or {}).get("api_key", "")
+
     if relay.get("base_url") and key and key != "sk-xxx":
         relay["api_key"] = key
         return relay

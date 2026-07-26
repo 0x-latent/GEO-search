@@ -1,8 +1,13 @@
 # 中继网关（new-api）：enabled 时默认所有模型经中继调用，成本监控与模型放行在 new-api 后台
-# 令牌配置在 api_keys.yaml 的 relay.api_key；缺失时自动回退直连
+#
+# 地址与令牌优先从环境变量读取（AGENT_GATEWAY_BASE_URL / AGENT_GATEWAY_API_KEY，
+# 兼容 NEWAPI_* 别名）；本文件中的 base_url 仅作兜底，**不要写入真实地址**——
+# 本文件提交进版本库，真实网关地址会随仓库一起流出，换网关时也得改代码再部署。
+# 令牌同理，配置在 api_keys.yaml 的 relay.api_key（该文件不进 git）。
+# 地址与令牌都取不到时自动回退直连。
 relay:
   enabled: true
-  base_url: "http://104.238.150.252:3000/v1"
+  base_url: ""
 
 models:
   qwen:
