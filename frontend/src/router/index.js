@@ -3,7 +3,7 @@ import { createRouter, createWebHashHistory } from "vue-router";
 import { useSessionStore } from "@/stores/session";
 
 // hash 路由：StaticFiles(html=True) 不支持 history 深层路径回退，
-// hash 模式零后端改动，且与独立公开的 login.html 共存无冲突。
+// hash 模式零后端改动，认证统一交给门户处理。
 const router = createRouter({
   history: createWebHashHistory(),
   routes: [

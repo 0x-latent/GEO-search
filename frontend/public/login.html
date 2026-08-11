@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>登录 - GEO 洞察平台</title>
+    <title>门户登录 - GEO 洞察平台</title>
     <style>
       :root {
         --bg: #f5f6f7;
@@ -98,55 +98,19 @@
     </style>
   </head>
   <body>
-    <form class="card" id="login-form">
+    <main class="card">
       <div class="brand">
         <span class="brand-mark">G</span>
         <div>
           <strong>GEO 洞察平台</strong>
-          <small>请登录后访问</small>
+          <small>正在跳转到门户登录</small>
         </div>
       </div>
-      <label for="username">用户名</label>
-      <input id="username" name="username" autocomplete="username" required autofocus />
-      <label for="password">密码</label>
-      <input id="password" name="password" type="password" autocomplete="current-password" required />
-      <p class="error" id="error"></p>
-      <button type="submit" id="submit">登录</button>
-    </form>
+      <p class="error">账户和密码由门户统一管理。</p>
+      <button type="button" onclick="window.location.replace('/portal/login')">返回门户登录</button>
+    </main>
     <script>
-      const form = document.getElementById("login-form");
-      const errorEl = document.getElementById("error");
-      const submitBtn = document.getElementById("submit");
-
-      fetch("api/auth/me").then((res) => {
-        if (res.ok) window.location.replace("./");
-      });
-
-      form.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        errorEl.textContent = "";
-        submitBtn.disabled = true;
-        try {
-          const res = await fetch("api/auth/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              username: document.getElementById("username").value.trim(),
-              password: document.getElementById("password").value,
-            }),
-          });
-          if (res.ok) {
-            window.location.replace("./");
-            return;
-          }
-          const data = await res.json().catch(() => ({}));
-          errorEl.textContent = data.detail || "登录失败，请重试";
-        } catch (err) {
-          errorEl.textContent = "网络错误，请重试";
-        } finally {
-          submitBtn.disabled = false;
-        }
-      });
+      window.setTimeout(() => window.location.replace("/portal/login"), 50);
     </script>
   </body>
 </html>

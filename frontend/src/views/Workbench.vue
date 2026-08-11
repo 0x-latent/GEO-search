@@ -1,12 +1,10 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 
-import { api, apiJson, query } from "@/api/client";
-import { useSessionStore } from "@/stores/session";
+import { api, query } from "@/api/client";
 import { fmtNumber } from "@/utils/format";
 
-const session = useSessionStore();
 const activeTab = ref("datasets");
 
 // ---------- 数据集 ----------
@@ -86,74 +84,9 @@ async function loadSamples() {
   }
 }
 
-// ---------- 用户管理 ----------
-const users = ref([]);
-const newUser = reactive({ username: "", password: "", role: "user" });
-
-async function loadUsers() {
-  try {
-    users.value = await api("/api/auth/users");
-  } catch (error) {
-    ElMessage.error(`加载用户失败：${error.message}`);
-  }
-}
-
-async function createUser() {
-  try {
-    await apiJson("/api/auth/users", "POST", { ...newUser });
-    ElMessage.success(`已创建用户 ${newUser.username}`);
-    newUser.username = "";
-    newUser.password = "";
-    await loadUsers();
-  } catch (error) {
-    ElMessage.error(`创建失败：${error.message}`);
-  }
-}
-
-async function resetPassword(user) {
-  try {
-    const { value } = await ElMessageBox.prompt(`为 ${user.username} 设置新密码（至少 6 位）`, "重置密码", {
-      inputType: "password",
-    });
-    if (!value) return;
-    await apiJson(`/api/auth/users/${encodeURIComponent(user.username)}/password`, "PUT", {
-      password: value,
-    });
-    ElMessage.success("已重置密码");
-  } catch (error) {
-    if (error !== "cancel" && error?.message) ElMessage.error(`操作失败：${error.message}`);
-  }
-}
-
-async function toggleRole(user) {
-  const role = user.role === "admin" ? "user" : "admin";
-  try {
-    await apiJson(`/api/auth/users/${encodeURIComponent(user.username)}/role`, "PUT", { role });
-    ElMessage.success("已调整角色");
-    await loadUsers();
-  } catch (error) {
-    ElMessage.error(`操作失败：${error.message}`);
-  }
-}
-
-async function removeUser(user) {
-  try {
-    await ElMessageBox.confirm(`确认删除用户 ${user.username}？`, "删除用户", { type: "warning" });
-  } catch {
-    return;
-  }
-  try {
-    await api(`/api/auth/users/${encodeURIComponent(user.username)}`, { method: "DELETE" });
-    ElMessage.success("已删除");
-    await loadUsers();
-  } catch (error) {
-    ElMessage.error(`删除失败：${error.message}`);
-  }
-}
-
 onMounted(async () => {
   await loadDatasets();
-  await Promise.all([loadSplits(), loadUsers()]);
+  await loadSplits();
 });
 
 function onTab(name) {
@@ -170,7 +103,7 @@ function onDatasetFilter() {
   <div class="page">
     <div class="page-header">
       <h1>工作台</h1>
-      <p>数据侧与管理员的明细视图：数据集、拆分表、回答样本和用户管理。业务结论请看「品牌总览」。</p>
+      <p>数据侧与管理员的明细视图：数据集、拆分表和回答样本。账户与权限由门户统一管理，业务结论请看「品牌总览」。</p>
     </div>
 
     <el-tabs v-model="activeTab" @tab-change="onTab">
@@ -255,65 +188,6 @@ function onDatasetFilter() {
         </el-table>
       </el-tab-pane>
 
-      <el-tab-pane label="用户管理" name="users">
-        <el-card shadow="never" style="max-width: 620px; margin-bottom: 16px">
-          <template #header><strong>新建用户</strong></template>
-          <el-space wrap>
-            <el-input v-model="newUser.username" placeholder="用户名" style="width: 160px" />
-            <el-input
-              v-model="newUser.password"
-              type="password"
-              placeholder="密码（至少 6 位）"
-              style="width: 180px"
-            />
-            <el-select v-model="newUser.role" style="width: 120px">
-              <el-option value="user" label="普通用户" />
-              <el-option value="admin" label="管理员" />
-            </el-select>
-            <el-button type="primary" @click="createUser">创建</el-button>
-          </el-space>
-        </el-card>
-        <el-table :data="users" size="small" style="max-width: 760px">
-          <el-table-column prop="username" label="用户名" min-width="140">
-            <template #default="{ row }">
-              {{ row.username }}
-              <el-tag v-if="row.username === session.user?.username" size="small">我</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="角色" width="100">
-            <template #default="{ row }">
-              {{ row.role === "admin" ? "管理员" : "普通用户" }}
-            </template>
-          </el-table-column>
-          <el-table-column label="创建时间" width="170">
-            <template #default="{ row }">
-              {{ new Date(row.created_at * 1000).toLocaleString("zh-CN") }}
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="240">
-            <template #default="{ row }">
-              <el-button link size="small" @click="resetPassword(row)">重置密码</el-button>
-              <el-button
-                link
-                size="small"
-                :disabled="row.username === session.user?.username"
-                @click="toggleRole(row)"
-              >
-                设为{{ row.role === "admin" ? "普通用户" : "管理员" }}
-              </el-button>
-              <el-button
-                link
-                type="danger"
-                size="small"
-                :disabled="row.username === session.user?.username"
-                @click="removeUser(row)"
-              >
-                删除
-              </el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-tab-pane>
     </el-tabs>
   </div>
 </template>

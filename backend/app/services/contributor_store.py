@@ -612,6 +612,8 @@ def update_review_settings(values: dict[str, Any], admin: str) -> dict[str, Any]
                "fallback_model_key", "fallback_model_id", "ai_concurrency",
                "request_timeout_seconds", "retry_count", "similarity_threshold", "similarity_top_k"}
     fields = {key: value for key, value in values.items() if key in allowed}
+    if not fields:
+        return get_review_settings()
     concurrency = int(fields.get("ai_concurrency", 5))
     if not 1 <= concurrency <= 100:
         raise ValueError("并发数必须在 1 到 100 之间")

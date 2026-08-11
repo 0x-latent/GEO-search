@@ -85,6 +85,8 @@ class SourceInsightStoreTest(unittest.TestCase):
             store.normalize_url("https://www.nmpa.gov.cn/a?utm_source=test&x=1"),
             "https://nmpa.gov.cn/a?x=1",
         )
+        self.assertEqual(store.normalize_url("javascript:alert(1)"), "")
+        self.assertEqual(store.normalize_url("data:text/html,pwned"), "")
 
     def test_classification_uses_catalog(self) -> None:
         regulator = store.classify_domain("nmpa.gov.cn")

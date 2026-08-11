@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -17,20 +18,39 @@ MAX_CONFIG_BYTES = 2 * 1024 * 1024
 
 
 def _user_dir(username: str) -> Path:
-    safe = "".join(c for c in username if c.isalnum() or c in "-_")
+    normalized = username.strip()
+    if not normalized:
+        raise ValueError("非法用户名")
+    # 门户用户名可能包含点号、斜线或非 ASCII 字符；直接清洗会把不同用户
+    # 映射到同一目录（例如 a.b 与 ab），因此使用不可逆且碰撞概率可忽略的键。
+    key = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+    return USER_CONFIGS_DIR / key
+
+
+def _legacy_user_dir(username: str) -> Path:
+    """旧版目录键，仅用于读取/清理历史配置。新写入一律使用哈希键。"""
+    safe = "".join(c for c in username.strip() if c.isalnum() or c in "-_")
     if not safe:
         raise ValueError("非法用户名")
     return USER_CONFIGS_DIR / safe
 
 
+def _user_config_path(username: str, filename: str) -> Path:
+    current = _user_dir(username) / filename
+    if current.exists():
+        return current
+    legacy = _legacy_user_dir(username) / filename
+    return legacy if legacy.exists() else current
+
+
 def user_brands_path(username: str) -> Path | None:
     """用户自定义 brands.yaml 的路径；未自定义时返回 None（表示用全局默认）。"""
-    path = _user_dir(username) / "brands.yaml"
+    path = _user_config_path(username, "brands.yaml")
     return path if path.exists() else None
 
 
 def user_kb_path(username: str) -> Path | None:
-    path = _user_dir(username) / "knowledge_base.json"
+    path = _user_config_path(username, "knowledge_base.json")
     return path if path.exists() else None
 
 
@@ -72,15 +92,23 @@ def save_user_kb(username: str, data: dict[str, Any]) -> None:
 
 
 def reset_user_brands(username: str) -> None:
-    path = _user_dir(username) / "brands.yaml"
-    if path.exists():
-        path.unlink()
+    paths = {
+        _user_dir(username) / "brands.yaml",
+        _legacy_user_dir(username) / "brands.yaml",
+    }
+    for path in paths:
+        if path.exists():
+            path.unlink()
 
 
 def reset_user_kb(username: str) -> None:
-    path = _user_dir(username) / "knowledge_base.json"
-    if path.exists():
-        path.unlink()
+    paths = {
+        _user_dir(username) / "knowledge_base.json",
+        _legacy_user_dir(username) / "knowledge_base.json",
+    }
+    for path in paths:
+        if path.exists():
+            path.unlink()
 
 
 def load_global_kb() -> dict[str, Any]:

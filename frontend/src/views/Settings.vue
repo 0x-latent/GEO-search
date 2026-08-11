@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 
-import { api, apiJson, appUrl } from "@/api/client";
+import { api, apiJson } from "@/api/client";
 import BrandsEditor from "@/components/config/BrandsEditor.vue";
 import KbEditor from "@/components/config/KbEditor.vue";
 import KbImportPanel from "@/components/config/KbImportPanel.vue";
@@ -21,7 +21,6 @@ const brandsEditor = ref(null);
 const kbEditor = ref(null);
 const rawBrands = ref("");
 const rawKb = ref("");
-const password = ref("");
 
 const PATHS = computed(() => ({
   brands: scope.value === "mine" ? "/api/config/my/brands" : "/api/config/brands",
@@ -102,20 +101,6 @@ async function resetMine(kind) {
     await load();
   } catch (error) {
     ElMessage.error(`操作失败：${error.message}`);
-  }
-}
-
-async function changePassword() {
-  if (password.value.length < 6) {
-    ElMessage.warning("密码至少 6 位");
-    return;
-  }
-  try {
-    await apiJson("/api/auth/me/password", "PUT", { password: password.value });
-    ElMessage.success("密码已修改，请重新登录");
-    window.location.href = appUrl("/login.html");
-  } catch (error) {
-    ElMessage.error(`修改失败：${error.message}`);
   }
 }
 
@@ -209,22 +194,6 @@ function switchScope(value) {
         </el-row>
       </el-tab-pane>
 
-      <el-tab-pane label="账号" name="account">
-        <el-card shadow="never" style="max-width: 480px">
-          <template #header><strong>修改我的密码</strong></template>
-          <el-space>
-            <el-input
-              v-model="password"
-              type="password"
-              show-password
-              placeholder="新密码（至少 6 位）"
-              style="width: 260px"
-            />
-            <el-button type="primary" @click="changePassword">修改密码</el-button>
-          </el-space>
-          <p class="muted" style="font-size: 12px">修改后需要重新登录。</p>
-        </el-card>
-      </el-tab-pane>
     </el-tabs>
   </div>
 </template>

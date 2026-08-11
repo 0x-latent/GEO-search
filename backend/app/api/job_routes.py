@@ -10,7 +10,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from ..services import job_store, product_master
-from ..services.question_parser import build_questions, parse_upload
+from ..services.question_parser import MAX_UPLOAD_BYTES, build_questions, parse_upload
 from ..services.yaml_store import load_models
 from .auth_routes import _current_user, _require_admin
 
@@ -77,7 +77,7 @@ async def parse_questions_file(
     default_product: str = Form(""),
 ) -> dict[str, Any]:
     _current_user(request)
-    content = await file.read()
+    content = await file.read(MAX_UPLOAD_BYTES + 1)
     try:
         questions, report = parse_upload(file.filename or "upload", content, default_product)
     except ValueError as exc:

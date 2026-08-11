@@ -552,10 +552,9 @@ def apply_import(
     if target_username and target_username != username:
         if role != "admin":
             raise ValueError("只有管理员能把知识库合并给其他用户")
-        from . import auth_store
-
-        if target_username not in {u["username"] for u in auth_store.list_users()}:
-            raise ValueError(f"用户不存在：{target_username}")
+        target_username = target_username.strip()
+        if not target_username:
+            raise ValueError("目标门户用户名不能为空")
         scope = "user"
 
     owner = target_username or username

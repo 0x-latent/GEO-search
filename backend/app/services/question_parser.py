@@ -9,6 +9,7 @@ from typing import Any
 from utils.sqlite_schema import match_stage
 
 MAX_QUESTIONS = 500
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 # 阶段 → 问题 id 前缀：决定流水线覆盖（05 推荐抽取 / 07 准确率）和三阶段归类
 _STAGE_QID_TAG = {"symptom": "q4", "category": "q5", "brand": "q1"}
@@ -208,7 +209,7 @@ def parse_upload(
     filename: str, content: bytes, default_product: str = ""
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """解析上传文件为标准问题列表 + 校验报告。"""
-    if len(content) > 10 * 1024 * 1024:
+    if len(content) > MAX_UPLOAD_BYTES:
         raise ValueError("文件超过 10MB")
     name = filename.lower()
     if name.endswith(".xlsx"):

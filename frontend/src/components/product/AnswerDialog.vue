@@ -71,9 +71,10 @@ watch(
           <el-divider content-position="left">引用信源（{{ answer.sources.length }}）</el-divider>
           <ol class="sources">
             <li v-for="source in answer.sources" :key="source.source_index">
-              <a :href="source.url" target="_blank" rel="noreferrer">
+              <a v-if="source.url" :href="source.url" target="_blank" rel="noopener noreferrer">
                 {{ source.title || source.url }}
               </a>
+              <span v-else>{{ source.title || "无有效链接" }}</span>
               <span class="muted" v-if="source.domain">（{{ source.domain }}）</span>
             </li>
           </ol>

@@ -18,17 +18,7 @@ const fileInput = ref(null);
 const productKey = ref("");
 const submitting = ref(false);
 const imports = ref([]);
-const allUsers = ref([]);
 let timer = null;
-
-async function loadUsers() {
-  if (!session.isAdmin) return;
-  try {
-    allUsers.value = await api("/api/auth/users");
-  } catch {
-    /* 非关键 */
-  }
-}
 
 const productOptions = computed(() => Object.keys(props.kbData || {}));
 
@@ -62,7 +52,6 @@ function pollIfActive() {
 
 onMounted(() => {
   loadImports();
-  loadUsers();
   timer = setInterval(pollIfActive, 5000);
 });
 onBeforeUnmount(() => clearInterval(timer));
@@ -110,8 +99,9 @@ const review = reactive({
   importId: "",
   productKey: "",
   loading: false,
-  // 合并目标：mine=我的配置 / global=全局默认 / 其他值=指定用户名（归属权划分）
+  // 合并目标：mine=我的配置 / global=全局默认 / portal-user=指定门户用户名
   target: "mine",
+  targetUsername: "",
   modules: [], // {id, name, text(可编辑), quotes, verified, adopt, currentText}
 });
 
@@ -159,9 +149,13 @@ async function applyReview() {
   const payload = { modules: adopted, scope: props.scope };
   if (review.target === "global") {
     payload.scope = "global";
-  } else if (review.target !== "mine") {
+  } else if (review.target === "portal-user") {
+    if (!review.targetUsername.trim()) {
+      ElMessage.warning("请填写目标门户用户名");
+      return;
+    }
     payload.scope = "user";
-    payload.target_username = review.target;
+    payload.target_username = review.targetUsername.trim();
   }
   try {
     const result = await api(`/api/kb-imports/${encodeURIComponent(review.importId)}/apply`, {
@@ -312,13 +306,15 @@ async function applyReview() {
           <el-select v-model="review.target" size="small" style="width: 200px">
             <el-option value="mine" label="我的配置" />
             <el-option value="global" label="全局默认（所有用户）" />
-            <el-option
-              v-for="user in allUsers.filter((u) => u.username !== session.user?.username)"
-              :key="user.username"
-              :value="user.username"
-              :label="`用户：${user.username}`"
-            />
+            <el-option value="portal-user" label="指定门户用户" />
           </el-select>
+          <el-input
+            v-if="review.target === 'portal-user'"
+            v-model="review.targetUsername"
+            size="small"
+            placeholder="门户用户名"
+            style="width: 180px"
+          />
         </el-space>
         <el-button @click="review.visible = false">取消</el-button>
         <el-button type="primary" @click="applyReview">

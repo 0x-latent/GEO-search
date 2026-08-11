@@ -7,6 +7,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
 from ..services import kb_import_store
+from ..services.document_extract import MAX_FILE_BYTES
 from .auth_routes import _current_user
 
 router = APIRouter(prefix="/api/kb-imports")
@@ -21,7 +22,7 @@ async def create_kb_import(
 ) -> dict[str, Any]:
     """上传产品资料（PDF/PPTX/TXT/图片），后台多模态识别并结构化为知识库草稿。"""
     user = _current_user(request)
-    content = await file.read()
+    content = await file.read(MAX_FILE_BYTES + 1)
     try:
         return kb_import_store.create_import(
             username=user["username"],

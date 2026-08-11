@@ -4,14 +4,19 @@
 
 ## 架构
 
-- 后端：FastAPI（`backend/app`），session cookie 认证，portal SSO 可选。
+- 后端：FastAPI（`backend/app`），仅接受门户 SSO 注入的身份和角色；账户、密码及用户管理由门户负责。
 - 前端：Vue 3 + Vite + Element Plus + ECharts（`frontend/`），构建产物输出到 `backend/app/static`（该目录是构建产物，不进 git）。
 - 数据：统一 SQLite `data/geo_datasets/geo_answers.sqlite`；指标在导入时物化（`manage_geo_sqlite.py materialize`），页面毫秒级响应。
 - schema 单一来源：`utils/sqlite_schema.py`（CLI 与后端启动共用，惰性迁移）。
 
 ## 本地开发
 
+后端启动前必须配置门户共享密钥；开发环境也需要由门户网关注入 `X-Portal-User`、`X-Portal-Role` 和 `X-Portal-Secret`。
+
 ```powershell
+# 示例（请使用实际门户网关的密钥）
+$env:GEO_PORTAL_SECRET = "replace-with-portal-secret"
+
 # 终端 1：后端（.venv）
 .\start_dashboard.bat -Reload
 
@@ -44,7 +49,7 @@ collect(03) → analyze(04) → extract(05, 含负面情感) → verify(07, 准�
 docker compose up --build -d   # 多阶段构建：node 构建前端 → python 运行
 ```
 
-运行数据与密钥通过 volume 挂载（见 docker-compose.yml），healthcheck 走 `/api/health`。
+运行数据与密钥通过 volume 挂载（见 docker-compose.yml）；启动前必须设置 `GEO_PORTAL_SECRET`，门户网关需使用同一密钥注入 `X-Portal-User` 和 `X-Portal-Role`，healthcheck 走 `/api/health`。
 
 ## 历史数据回刷
 

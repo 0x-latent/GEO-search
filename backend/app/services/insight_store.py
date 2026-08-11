@@ -17,6 +17,7 @@ import sqlite3
 from typing import Any
 
 from ..core.paths import GEO_SQLITE_PATH
+from .source_insight_store import normalize_url
 from utils.sqlite_schema import STAGES
 
 SEARCH_LABELS = {"1": "联网", "0": "非联网", "agg": "汇总"}
@@ -644,5 +645,7 @@ def answer_full(
                 """,
                 (dataset_id, row["answer_id"]),
             ))
+            for source in row["sources"]:
+                source["url"] = normalize_url(source.get("url"), source.get("domain"))
     exact = rows[0] if len(rows) == 1 else None
     return {"answer": exact, "candidates": rows if exact is None else []}

@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 
-import { api, appUrl } from "@/api/client";
+import { api } from "@/api/client";
 
 export const useSessionStore = defineStore("session", {
   state: () => ({
@@ -35,7 +35,7 @@ export const useSessionStore = defineStore("session", {
         window.location.replace("/portal/login");
         return;
       }
-      window.location.href = appUrl("/login.html");
+      window.location.replace("/portal/login");
     },
   },
 });

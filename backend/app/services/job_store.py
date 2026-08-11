@@ -251,7 +251,7 @@ def create_job(
         raise ValueError("batch_date 格式必须是 YYYY-MM-DD")
 
     job_id = f"job_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:6]}"
-    dataset_id = f"user_{username}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    dataset_id = f"user_{uuid4().hex}"
     job_dir = JOBS_DIR / job_id
     job_dir.mkdir(parents=True, exist_ok=True)
     (job_dir / "questions.json").write_text(

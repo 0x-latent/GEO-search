@@ -5,14 +5,14 @@ services:
       dockerfile: Dockerfile
     image: ${GEO_IMAGE:-geo-search-workbench:latest}
     ports:
-      # portal 网关就绪后在 .env 设 GEO_BIND=127.0.0.1 即可收回公网直连
-      - "${GEO_BIND:-0.0.0.0}:${GEO_PORT:-8000}:8000"
+      # 默认仅监听本机，由门户网关转发并注入身份头；确需跨主机时显式设置 GEO_BIND。
+      - "${GEO_BIND:-127.0.0.1}:${GEO_PORT:-8000}:8000"
     environment:
       LANG: C.UTF-8
       LC_ALL: C.UTF-8
-      GEO_ADMIN_PASSWORD: ${GEO_ADMIN_PASSWORD:-admin123}
-      # portal SSO 共享密钥：网关请求需携带 X-Portal-Secret 才能注入身份头；留空=关闭该通道
-      GEO_PORTAL_SECRET: ${GEO_PORTAL_SECRET:-}
+      # portal SSO 共享密钥：必须由网关请求携带，未配置时 compose 直接失败。
+      GEO_PORTAL_SECRET: ${GEO_PORTAL_SECRET:?GEO_PORTAL_SECRET must be set}
+      GEO_PORTAL_LOGIN_URL: ${GEO_PORTAL_LOGIN_URL:-/portal/login}
       GEO_ARTICLE_REVIEW_CONCURRENCY_MAX: ${GEO_ARTICLE_REVIEW_CONCURRENCY_MAX:-5}
     volumes:
       - ./config/api_keys.yaml:/app/config/api_keys.yaml:ro

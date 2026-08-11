@@ -58,10 +58,17 @@ def normalize_url(url: str | None, domain: str | None = None) -> str:
     try:
         parsed = urlsplit(text)
     except ValueError:
-        return text
+        return ""
+    scheme = parsed.scheme.lower()
+    # URL 会进入前端 href；只允许外部网页协议，禁止 javascript:/data:/相对路径等
+    # 内容被当成可执行链接。
+    if scheme not in {"http", "https"} or not parsed.hostname:
+        return ""
+    if parsed.username or parsed.password:
+        return ""
     host = normalize_domain(domain, text)
-    if not parsed.scheme or not host:
-        return text
+    if not host:
+        return ""
     query = [
         (key, value)
         for key, value in parse_qsl(parsed.query, keep_blank_values=True)
@@ -70,7 +77,7 @@ def normalize_url(url: str | None, domain: str | None = None) -> str:
     path = parsed.path or "/"
     if path != "/":
         path = path.rstrip("/")
-    return urlunsplit((parsed.scheme.lower(), host, path, urlencode(sorted(query)), ""))
+    return urlunsplit((scheme, host, path, urlencode(sorted(query)), ""))
 
 
 @lru_cache(maxsize=4)
@@ -246,7 +253,8 @@ def _source_rows(
         if domain_filter and normalized not in domain_filter:
             continue
         row.update(info)
-        row["canonical_url"] = normalize_url(row.get("url"), normalized)
+        row["url"] = normalize_url(row.get("url"), normalized)
+        row["canonical_url"] = row["url"]
         rows.append(row)
     return rows
 

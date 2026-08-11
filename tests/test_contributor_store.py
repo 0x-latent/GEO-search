@@ -92,6 +92,10 @@ class ContributorStoreTests(unittest.TestCase):
         self.assertEqual(settings["effective_concurrency"], 5)
         self.assertEqual(settings["ai_concurrency"], 30)
 
+    def test_empty_review_settings_update_is_a_noop(self):
+        settings = contributor_store.update_review_settings({}, "admin")
+        self.assertIn("effective_concurrency", settings)
+
     def test_document_parser_supports_markdown_and_scanned_pdf_state(self):
         ext, text = extract_article_text("hello.md", "# 标题\n正文".encode())
         self.assertEqual(ext, ".md")
