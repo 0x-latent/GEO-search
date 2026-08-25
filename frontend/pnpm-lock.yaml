@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@cr999ai/ui-vue':
-        specifier: file:vendor/cr999ai-ui-vue-0.3.1.tgz
-        version: file:vendor/cr999ai-ui-vue-0.3.1.tgz(vue@3.5.40)
+        specifier: file:vendor/cr999ai-ui-vue-0.3.2.tgz
+        version: file:vendor/cr999ai-ui-vue-0.3.2.tgz(vue@3.5.40)
       echarts:
         specifier: ^5.5.1
         version: 5.6.0
@@ -56,9 +56,9 @@ packages:
     resolution: {integrity: sha512-4zBIxpPzowiZpusoFkyGVwakdRJUyuH5PxQ/PrqghfdFWWasvnCdPfQXHrenDai+gyLARulZjZowCOj6fjT4pA==}
     engines: {node: '>=6.9.0'}
 
-  '@cr999ai/ui-vue@file:vendor/cr999ai-ui-vue-0.3.1.tgz':
-    resolution: {integrity: sha512-e07I6DbTJq/Xplt+v+t3Mq1RPeicKYZ7kGK6gKbadvN+7Bp/L7EwdiFtoLb34Ycy+WHAvbeCo1HgudpfXORG/A==, tarball: file:vendor/cr999ai-ui-vue-0.3.1.tgz}
-    version: 0.3.1
+  '@cr999ai/ui-vue@file:vendor/cr999ai-ui-vue-0.3.2.tgz':
+    resolution: {integrity: sha512-9nUaCqZPpyAK3QtrGNLQcQqG0DrImbkd4SCViV5XTJII3ZgwQhC/OCUWli/IkrPbd+fR+65Q1TttQ9TnTlx/ig==, tarball: file:vendor/cr999ai-ui-vue-0.3.2.tgz}
+    version: 0.3.2
     peerDependencies:
       vue: ^3.4.0
 
@@ -555,7 +555,7 @@ snapshots:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
 
-  '@cr999ai/ui-vue@file:vendor/cr999ai-ui-vue-0.3.1.tgz(vue@3.5.40)':
+  '@cr999ai/ui-vue@file:vendor/cr999ai-ui-vue-0.3.2.tgz(vue@3.5.40)':
     dependencies:
       vue: 3.5.40
 
