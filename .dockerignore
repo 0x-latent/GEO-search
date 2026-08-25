@@ -10,6 +10,7 @@ __pycache__/
 .ruff_cache/
 .env
 config/api_keys.yaml
+questions/
 results/
 backend/data/
 data/

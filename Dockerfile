@@ -43,13 +43,17 @@ COPY backend /app/backend
 COPY scripts /app/scripts
 COPY utils /app/utils
 COPY config /app/config
-COPY questions /app/questions
 COPY docs /app/docs
 
 # 前端构建产物覆盖静态目录（本地 backend/app/static 是构建产物，不进 git）
 COPY --from=webbuild /web/dist /app/backend/app/static
 
-RUN mkdir -p /app/results /app/backend/data
+# questions/results 都是活数据,由 compose 挂载进来(服务器上它们软链到
+# /data/appdata/geo_search/*)。镜像里只建空目录:
+#   1) 打包 context 时指向 context 之外的软链解析不了,COPY 会直接失败;
+#   2) 挂载会盖掉镜像内容,COPY 进去的那份本来就是死的
+#      —— QUESTIONS_DIR 在 backend/app/core/paths.py 里定义了但全仓库没有使用点。
+RUN mkdir -p /app/questions /app/results /app/backend/data
 
 EXPOSE 8000
 
