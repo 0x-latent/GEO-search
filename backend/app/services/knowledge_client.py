@@ -25,12 +25,35 @@ def screen(text, criteria):
         return re.sub(r"[\s　]+", "", value).translate(str.maketrans({"，": ",", "。": ".", "！": "!", "？": "?", "：": ":", "；": ";", "（": "(", "）": ")", "“": '"', "”": '"', "‘": "'", "’": "'"}))
     haystack, out = norm(text), []
     for rule in criteria["forbidden_expressions"]:
-        hit = next((v for v in (rule.get("match_variants") or [rule["expression"]]) if len(norm(v)) >= 3 and norm(v) in haystack), None)
+        variants = [rule["expression"], *rule.get("match_variants", [])]
+        hit = next((v for v in variants if norm(v) and norm(v) in haystack), None)
         if hit:
             out.append({"issue_type": "risk", "severity": "high", "excerpt": hit, "verdict": "conflict",
                         "kb_module": rule["code"], "evidence": rule.get("reason") or rule["expression"],
                         "suggestion": "请对照标准表达修改：" + "、".join(rule.get("alternative_codes", [])), "blocks_publication": True})
     return out
+
+
+def blocking_findings(text, context):
+    """Keep authoritative KB hits even when the local literal matcher misses them."""
+    rules = {rule["code"]: rule for rule in context["criteria"]["forbidden_expressions"]}
+    findings = []
+    for hit in context["findings"]:
+        rule = rules.get(hit["rule_code"], {})
+        alternatives = [hit["ref_code"]] if hit.get("ref_code") else rule.get("alternative_codes", [])
+        findings.append({
+            "issue_type": "risk", "severity": "high", "verdict": "conflict",
+            "excerpt": hit.get("matched_text") or rule.get("expression", ""),
+            "kb_module": hit["rule_code"],
+            "evidence": hit["message"] or rule.get("reason") or rule.get("expression", ""),
+            "suggestion": hit.get("suggestion") or "请对照标准表达修改：" + "、".join(alternatives),
+            "blocks_publication": True,
+        })
+    # Preserve separate KB occurrences; do not add another local hit for the same rule.
+    covered_rules = {finding["kb_module"] for finding in findings}
+    findings.extend(finding for finding in screen(text, context["criteria"])
+                    if finding["kb_module"] not in covered_rules)
+    return findings
 
 
 def validate(payload, product, text):

@@ -304,3 +304,98 @@ def test_kb_deterministic_forbidden_expression_blocks_even_if_model_passes(workf
     assert detail['findings'][0]['blocks_publication'] == 1
     with pytest.raises(ValueError, match='阻断'):
         ps.decide(sid, EXPERT, 'approve', 2, 0, '', [])
+
+
+def validated_context(payload, product, text):
+    basis = {key: payload[key] for key in ('role', 'product', 'criteria', 'standard_revisions')}
+    payload['criteria_sha256'] = hashlib.sha256(kb.canonical(basis).encode()).hexdigest()
+    return kb.validate(payload, product, text)
+
+
+@pytest.mark.parametrize('local_match', [False, True])
+def test_kb_mandatory_hits_block_approval_even_if_model_passes(workflow, monkeypatch, local_match):
+    _, _, sub, _, _ = workflow()
+
+    def context(product, text):
+        payload = fixed(product, text)
+        payload['criteria']['forbidden_expressions'] = [{
+            'code': 'FE-AN-001', 'expression': text if local_match else '另一禁用表达',
+            'match_variants': ['替代表达'],
+        }]
+        payload['findings'] = [{
+            'rule_source': 'brand', 'rule_code': 'FE-AN-001', 'severity': 'must',
+            'message': '知识库确认此处命中禁用规则', 'matched_text': text,
+            'suggestion': '请删除该宣称',
+        }]
+        return validated_context(payload, product, text)
+
+    async def model(*args):
+        return {'verdict': 'pass', 'findings': []}, '{}', 'test', 'test', []
+
+    monkeypatch.setattr(kb, 'fetch_context', context)
+    monkeypatch.setattr(review, '_call_json', model)
+    asyncio.run(review.process_job(review.claim_jobs('worker', 1)[0]))
+    detail = cs.get_submission(sub['submission_id'])
+    assert detail['status'] == 'awaiting_admin'
+    assert len(detail['findings']) == 1  # KB and local hits for the same rule are merged.
+    finding = detail['findings'][0]
+    assert finding['blocks_publication'] == 1
+    assert finding['evidence'] == '知识库确认此处命中禁用规则'
+    assert finding['suggestion'] == '请删除该宣称'
+    with pytest.raises(ValueError, match='阻断'):
+        ps.decide(sub['submission_id'], EXPERT, 'approve', 1, 0, '', [])
+
+
+@pytest.mark.parametrize('text,expression,variants,expected', [
+    ('绝对安全', '绝对安全', ['百分百安全'], True),
+    ('百分百安全', '绝对安全', ['百分百安全'], True),
+    ('最佳', '最佳', [], True),
+    ('普通说明', '禁用', ['', '  '], False),
+])
+def test_local_screen_checks_original_variants_and_short_expressions(text, expression, variants, expected):
+    criteria = {'forbidden_expressions': [{
+        'code': 'FE-AN-001', 'expression': expression, 'match_variants': variants,
+    }]}
+    assert bool(kb.screen(text, criteria)) is expected
+
+
+@pytest.mark.parametrize('mode', ['success', 'fallback', 'rejected'])
+def test_large_project_context_reaches_models_without_truncation(workflow, monkeypatch, mode):
+    _, _, sub, _, _ = workflow()
+    snapshots, prompts = [], []
+
+    def context(product, text):
+        payload = fixed(product, text)
+        standards = [{'code': f'SE-AN-{i:03}', 'content': 'A' * 2000} for i in range(1, 101)]
+        payload['criteria']['standard_expressions'] = standards
+        payload['standard_revisions'] = {row['code']: None for row in standards}
+        payload['criteria']['compliance_notes'] = [{'content': '末尾合规条款也必须参与审核'}]
+        payload = validated_context(payload, product, text)
+        assert 160_000 < len(kb.canonical(payload).encode()) < kb.MAX_CONTEXT_BYTES
+        snapshots.append(payload)
+        return payload
+
+    async def model(model_key, model_id, prompt, *args):
+        prompts.append(prompt)
+        if mode == 'rejected' or (mode == 'fallback' and len(prompts) == 1):
+            raise ValueError('模型上下文长度限制')
+        return {'verdict': 'pass', 'findings': []}, '{}', 'test', 'test', []
+
+    monkeypatch.setattr(kb, 'fetch_context', context)
+    monkeypatch.setattr(review, '_call_json', model)
+    job = review.claim_jobs('worker', 1)[0]
+    job['settings']['fallback_model_key'] = 'fallback' if mode == 'fallback' else None
+    asyncio.run(review.process_job(job))
+    assert len(prompts) == (2 if mode == 'fallback' else 1)
+    for prompt in prompts:
+        knowledge_json = prompt.split('产品知识库：\n', 1)[1].split('\n\n待审文章标题：', 1)[0]
+        assert json.loads(knowledge_json) == snapshots[0]
+    detail = cs.get_submission(sub['submission_id'])
+    if mode == 'rejected':
+        assert detail['status'] == 'review_failed'
+        assert not detail['report']
+        with pytest.raises(ValueError):
+            ps.decide(sub['submission_id'], EXPERT, 'approve', 1, 0, '', [])
+    else:
+        assert detail['status'] == 'awaiting_admin'
+        assert json.loads(detail['report']['knowledge_snapshot_json']) == snapshots[0]
