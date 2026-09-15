@@ -251,16 +251,38 @@ def claim_jobs(worker_id: str, limit: int) -> list[dict[str, Any]]:
             )
             if cur.rowcount:
                 conn.execute("UPDATE article_submissions SET status='reviewing',updated_at=? WHERE submission_id=?", (contributor_store._iso(now), row["submission_id"]))
-                claimed.append(dict(row) | {"settings": settings})
+                claimed.append(dict(row) | {
+                    "settings": settings, "status": "running", "lease_owner": worker_id,
+                    "attempts": row["attempts"] + 1,
+                })
         conn.commit()
     return claimed
 
 
-def _job_update(job_id: str, **values: Any) -> None:
+class StaleReview(Exception):
+    """The review has been cancelled, replaced, or claimed by another attempt."""
+
+
+def _assert_active_job(conn: Any, job: dict[str, Any]) -> None:
+    active = conn.execute(
+        """SELECT 1 FROM article_review_jobs j
+           JOIN article_submissions s USING(submission_id)
+           WHERE j.job_id=? AND j.status='running' AND j.lease_owner=? AND j.attempts=?
+             AND j.lease_expires_at>? AND s.current_version=j.version
+             AND s.status='reviewing'""",
+        (job["job_id"], job["lease_owner"], job["attempts"], contributor_store._iso()),
+    ).fetchone()
+    if active is None:
+        raise StaleReview()
+
+
+def _job_update(job: dict[str, Any], **values: Any) -> None:
     values["updated_at"] = contributor_store._iso()
     sets = ",".join(f"{key}=?" for key in values)
     with closing(contributor_store._connect()) as conn:
-        conn.execute(f"UPDATE article_review_jobs SET {sets} WHERE job_id=?", (*values.values(), job_id))
+        conn.execute("BEGIN IMMEDIATE")
+        _assert_active_job(conn, job)
+        conn.execute(f"UPDATE article_review_jobs SET {sets} WHERE job_id=?", (*values.values(), job["job_id"]))
         conn.commit()
 
 
@@ -270,6 +292,7 @@ async def process_job(job: dict[str, Any]) -> None:
     retry_log: list[dict[str, Any]] = []
     try:
         with closing(contributor_store._connect()) as conn:
+            _assert_active_job(conn, job)
             row = conn.execute(
                 """SELECT s.*,v.original_filename,v.relative_path,v.content_text,v.content_sha256
                 FROM article_review_jobs j JOIN article_submissions s USING(submission_id)
@@ -289,6 +312,8 @@ async def process_job(job: dict[str, Any]) -> None:
                 message = str(parse_exc)
                 now = contributor_store._iso()
                 with closing(contributor_store._connect()) as conn:
+                    conn.execute("BEGIN IMMEDIATE")
+                    _assert_active_job(conn, job)
                     conn.execute("""UPDATE article_review_jobs SET status='failed',stage='parse_failed',
                         error_message=?,finished_at=?,lease_owner=NULL,lease_expires_at=NULL,updated_at=?
                         WHERE job_id=?""", (message, now, now, job["job_id"]))
@@ -306,6 +331,8 @@ async def process_job(job: dict[str, Any]) -> None:
                 return
             content_sha = hashlib.sha256(content.encode("utf-8")).hexdigest()
             with closing(contributor_store._connect()) as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                _assert_active_job(conn, job)
                 conn.execute("UPDATE article_submission_versions SET content_text=?,content_sha256=?,parse_error=NULL WHERE submission_id=? AND version=?", (content, content_sha, row["submission_id"], job["version"]))
                 conn.commit()
         else:
@@ -313,11 +340,13 @@ async def process_job(job: dict[str, Any]) -> None:
         kb, kb_sha = _product_kb(row["product_code"])
         if kb is None:
             with closing(contributor_store._connect()) as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                _assert_active_job(conn, job)
                 conn.execute("UPDATE article_review_jobs SET status='blocked_missing_kb',stage='blocked_missing_kb',error_message='产品知识库缺失',finished_at=?,updated_at=? WHERE job_id=?", (contributor_store._iso(), contributor_store._iso(), job["job_id"]))
                 conn.execute("UPDATE article_submissions SET status='blocked_missing_kb',updated_at=? WHERE submission_id=?", (contributor_store._iso(), row["submission_id"]))
                 conn.commit()
             return
-        _job_update(job["job_id"], stage="fact_review", progress=.25)
+        _job_update(job, stage="fact_review", progress=.25)
         try:
             review, raw_answer, model_key, model_id, retry_log = await _call_json(
                 settings["primary_model_key"], settings["primary_model_id"],
@@ -325,6 +354,7 @@ async def process_job(job: dict[str, Any]) -> None:
                 settings["request_timeout_seconds"], settings["retry_count"],
             )
         except Exception as primary_exc:
+            _job_update(job, stage="fact_review", progress=.25)
             if not settings.get("fallback_model_key"):
                 raise
             retry_log.append({"fallback_after": str(primary_exc)[:500], "at": contributor_store._iso()})
@@ -334,7 +364,7 @@ async def process_job(job: dict[str, Any]) -> None:
                 settings["request_timeout_seconds"], settings["retry_count"],
             )
             retry_log.extend(fallback_log)
-        _job_update(job["job_id"], stage="similarity", progress=.65)
+        _job_update(job, stage="similarity", progress=.65)
         candidates = await asyncio.to_thread(
             _lexical_candidates, row["submission_id"], job["version"], row["title"],
             content, content_sha, settings["similarity_top_k"],
@@ -351,12 +381,7 @@ async def process_job(job: dict[str, Any]) -> None:
         duration = int((time.monotonic() - started) * 1000)
         with closing(contributor_store._connect()) as conn:
             conn.execute("BEGIN IMMEDIATE")
-            current = conn.execute(
-                "SELECT status FROM article_review_jobs WHERE job_id=?", (job["job_id"],)
-            ).fetchone()
-            if not current or current["status"] != "running":
-                conn.rollback()
-                return
+            _assert_active_job(conn, job)
             conn.execute("DELETE FROM article_review_findings WHERE job_id=?", (job["job_id"],))
             conn.execute("DELETE FROM article_similarity_matches WHERE job_id=?", (job["job_id"],))
             conn.execute("DELETE FROM article_review_reports WHERE job_id=?", (job["job_id"],))
@@ -395,10 +420,17 @@ async def process_job(job: dict[str, Any]) -> None:
             conn.execute("UPDATE article_submissions SET status='awaiting_admin',updated_at=? WHERE submission_id=?", (now, row["submission_id"]))
             contributor_store._event(conn, row["submission_id"], "system", job["job_id"], "ai_review_completed", "reviewing", "awaiting_admin", {"verdict": review.get("verdict"), "model": f"{model_key}:{model_id}"})
             conn.commit()
+    except StaleReview:
+        return
     except Exception as exc:
         logger.exception("article review job failed: %s", job["job_id"])
         now = contributor_store._iso()
         with closing(contributor_store._connect()) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                _assert_active_job(conn, job)
+            except StaleReview:
+                return
             conn.execute("UPDATE article_review_jobs SET status='failed',stage='failed',error_message=?,finished_at=?,lease_owner=NULL,lease_expires_at=NULL,updated_at=? WHERE job_id=?", (str(exc)[:2000], now, now, job["job_id"]))
             conn.execute("UPDATE article_submissions SET status='review_failed',updated_at=? WHERE submission_id=?", (now, job["submission_id"]))
             conn.execute("UPDATE article_submission_versions SET parse_error=coalesce(parse_error,?) WHERE submission_id=? AND version=?", (str(exc)[:2000], job["submission_id"], job["version"]))

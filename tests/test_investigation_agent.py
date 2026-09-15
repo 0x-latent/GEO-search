@@ -382,6 +382,35 @@ def test_investigation_detail_uses_dataset_scope_as_404(
     )
 
 
+def test_auto_baseline_stays_with_dataset_owner(investigation_env):
+    _, geo = investigation_env
+    assert investigation_store.select_baseline("current", "p1") == "base"
+    with sqlite3.connect(geo) as conn:
+        conn.execute("UPDATE datasets SET owner_username='bob' WHERE dataset_id='base'")
+    assert investigation_store.select_baseline("current", "p1") is None
+    with pytest.raises(ValueError, match="基线"):
+        investigation_store.create_manual_investigation("alice", {
+            "current_dataset_id": "current", "product_code": "p1",
+            "metric": "brand_rec_rate", "auto_start": False,
+        })
+
+
+def test_existing_cross_owner_investigation_is_hidden(investigation_env, monkeypatch):
+    item = investigation_store.create_manual_investigation("alice", {
+        "current_dataset_id": "current", "baseline_dataset_id": "base",
+        "product_code": "p1", "metric": "brand_rec_rate", "auto_start": False,
+    })
+    request = Request({"type": "http", "headers": []})
+    request.state.user = {"username": "alice", "role": "user"}
+    monkeypatch.setattr(api_routes, "get_owned_dataset_ids", lambda username: ["current"])
+    with pytest.raises(HTTPException) as error:
+        investigation_routes._owned(item["investigation_id"], request)
+    assert error.value.status_code == 404
+    assert investigation_routes.investigations(request) == []
+    request.state.user = {"username": "admin", "role": "admin"}
+    assert investigation_routes._owned(item["investigation_id"], request)
+
+
 def test_private_and_loopback_hosts_are_blocked(monkeypatch):
     monkeypatch.setattr(
         investigation_tools.socket,

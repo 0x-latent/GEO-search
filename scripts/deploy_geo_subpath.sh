@@ -27,10 +27,10 @@ p = "/etc/nginx/sites-enabled/aigc-creative-workflow"
 text = open(p).read()
 secret = re.search(r"X-Portal-Secret (\S+);", text).group(1)
 new_block = open("/tmp/nginx_geo_location.conf").read().replace("__PORTAL_SECRET__", secret)
-# 替换整个 location /geo/ { ... } 块（该块无嵌套花括号）
+# 顶层闭括号缩进固定为四空格，嵌套 location 使用八空格。
 pattern = re.compile(r"    location /geo/ \{.*?\n    \}\n", re.S)
 assert pattern.search(text), "location /geo/ 块未找到"
-open(p, "w").write(pattern.sub(new_block, text))
+open(p, "w").write(pattern.sub(lambda match: new_block, text))
 print("nginx 配置已替换")
 EOF'
 

@@ -505,6 +505,10 @@ def list_investigations(
             f"current_dataset_id IN ({','.join('?' for _ in allowed_dataset_ids)})"
         )
         params.extend(allowed_dataset_ids)
+        conditions.append(
+            f"(baseline_dataset_id IS NULL OR baseline_dataset_id IN ({','.join('?' for _ in allowed_dataset_ids)}))"
+        )
+        params.extend(allowed_dataset_ids)
     if status:
         conditions.append("status=?")
         params.append(status)
@@ -796,13 +800,13 @@ def select_baseline(
                FROM dataset_products dp
                JOIN datasets d ON d.dataset_id=dp.dataset_id
                WHERE dp.product_code=? AND dp.question_set_id=?
-                 AND dp.dataset_id<>?
+                 AND dp.dataset_id<>? AND d.owner_username IS ?
                  AND COALESCE(d.batch_date,d.imported_at,'') <
                      COALESCE(?, ?, '9999')
                ORDER BY COALESCE(d.batch_date,d.imported_at,'') DESC
                LIMIT 1""",
             (
-                product_code, question_set_id, current_dataset_id,
+                product_code, question_set_id, current_dataset_id, current.get("owner_username"),
                 current.get("batch_date"), current.get("imported_at"),
             ),
         ).fetchone()

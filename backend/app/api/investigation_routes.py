@@ -75,7 +75,10 @@ def _owned(investigation_id: str, request: Request) -> dict[str, Any]:
     if item is None:
         raise HTTPException(status_code=404, detail="调查不存在")
     allowed = _dataset_scope(request)
-    if allowed is not None and item["current_dataset_id"] not in allowed:
+    if allowed is not None and (
+        item["current_dataset_id"] not in allowed
+        or (item.get("baseline_dataset_id") and item["baseline_dataset_id"] not in allowed)
+    ):
         raise HTTPException(status_code=404, detail="调查不存在")
     return item
 

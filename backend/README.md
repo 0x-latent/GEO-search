@@ -51,7 +51,22 @@ docker compose up --build -d   # 多阶段构建：node 构建前端 → python 
 
 运行数据与密钥通过 volume 挂载（见 docker-compose.yml）；启动前必须设置 `GEO_PORTAL_SECRET`，门户网关需使用同一密钥注入 `X-Portal-User` 和 `X-Portal-Role`，healthcheck 走 `/api/health`。
 
-## 历史数据回刷
+## 2026-09 审查修复后的运行说明
+
+- 调查的自动基线仅取当前数据集同一归属用户的批次；普通用户读取调查时同时检查当前批次和基线权限。管理员仍可显式选择跨用户基线。
+- 用户配置仅从门户用户名的 SHA-256 目录读取。旧版清洗用户名目录不会自动读取或删除：管理员应先备份并核对真实归属，再由对应用户在设置页重新保存品牌配置和知识库；不要仅根据旧目录名推断用户。
+- 采集、分析、推荐抽取和准确率校验遇到执行失败会停止任务并显示失败，支持重试。采集及推荐抽取复用成功断点，校验阶段重新执行；缺少知识库导致的跳过仍按原逻辑处理。
+- 推荐抽取日志升级为版本 2。旧版空缓存无法区分失败与真实空结果，会在下次重跑时重新抽取一次；新版本的成功空结果继续缓存。
+- 更新部署时应停止旧审稿 Worker，再启动新 Web 和 Worker，避免旧进程继续按旧规则写入任务状态。应用 `scripts/nginx_geo_location.conf` 后，外部投稿入口及其资源由投稿会话鉴权，其余接口仍由门户鉴权。
+
+### 回归测试
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider
+```
+
+## 历史数据回刷命令
 
 ```bash
 python scripts/backfill_dataset.py --dataset-id <id> --sample 50   # 先抽样对比口径

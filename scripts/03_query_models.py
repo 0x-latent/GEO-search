@@ -9,10 +9,12 @@ import sys
 import time
 import logging
 import yaml
+from pathlib import Path
 from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.api_clients import ModelClient, resolve_relay, resolve_route
+from utils.question_validation import validate_question_id, validate_questions
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -67,7 +69,10 @@ class AdaptiveThrottle:
 
         self.concurrency = initial_concurrency
         self.interval = initial_interval
-        self.semaphore = asyncio.Semaphore(initial_concurrency)
+        # 保留同一组等待者；替换 Semaphore 会让旧信号量上的请求永久等待。
+        self._active = 0
+        self._capacity_changed = asyncio.Event()
+        self._pause_until = 0.0
 
         # 限流暂停锁：遇到429时所有请求等待
         self._pause_event = asyncio.Event()
@@ -77,13 +82,23 @@ class AdaptiveThrottle:
         self._recover_threshold = 50  # 连续成功50次后尝试恢复
 
     async def acquire(self):
-        """获取执行许可（等待暂停恢复 + 信号量）"""
-        await self._pause_event.wait()
-        await self.semaphore.acquire()
-        await asyncio.sleep(self.interval)
+        """获取执行许可，动态并发调整不丢失已排队的请求。"""
+        while True:
+            await self._pause_event.wait()
+            if self._active < self.concurrency:
+                self._active += 1
+                break
+            self._capacity_changed.clear()
+            await self._capacity_changed.wait()
+        try:
+            await asyncio.sleep(self.interval)
+        except BaseException:
+            self.release()
+            raise
 
     def release(self):
-        self.semaphore.release()
+        self._active -= 1
+        self._capacity_changed.set()
 
     def on_success(self):
         self._consecutive_success += 1
@@ -92,7 +107,7 @@ class AdaptiveThrottle:
                 and self.concurrency < self.initial_concurrency):
             self.concurrency = min(self.concurrency + 1, self.initial_concurrency)
             self.interval = max(self.interval - 0.05, self.initial_interval)
-            self.semaphore = asyncio.Semaphore(self.concurrency)
+            self._capacity_changed.set()
             logger.info(f"[{self.model_key}] 恢复并发至 {self.concurrency}, 间隔 {self.interval:.2f}s")
             self._consecutive_success = 0
 
@@ -110,7 +125,6 @@ class AdaptiveThrottle:
         old_concurrency = self.concurrency
         self.concurrency = max(1, self.concurrency // 2)
         self.interval = min(self.interval * 1.5, 5.0)
-        self.semaphore = asyncio.Semaphore(self.concurrency)
 
         logger.warning(
             f"[{self.model_key}] 触发限流！暂停 {wait:.0f}s, "
@@ -120,7 +134,11 @@ class AdaptiveThrottle:
 
         # 暂停所有请求
         self._pause_event.clear()
-        await asyncio.sleep(wait)
+        loop = asyncio.get_running_loop()
+        self._pause_until = max(self._pause_until, loop.time() + wait)
+        # 多个请求同时限流时，较早结束的等待不能提前解除后续暂停。
+        while (remaining := self._pause_until - loop.time()) > 0:
+            await asyncio.sleep(remaining)
         self._pause_event.set()
 
         logger.info(f"[{self.model_key}] 限流等待结束，恢复执行")
@@ -170,6 +188,7 @@ def make_task_key(question_id: str, model: str, search_enabled: bool, round_num:
 
 
 def result_filename(question_id: str, round_num: int, search_enabled: bool) -> str:
+    validate_question_id(question_id)
     search_tag = "search" if search_enabled else "nosearch"
     return f"{question_id}_r{round_num}_{search_tag}.json"
 
@@ -188,17 +207,23 @@ async def execute_single_query(
     counter: dict,
 ):
     """执行单次查询（带自适应限流控制）"""
+    fname = result_filename(question["id"], round_num, search_enabled)
+    model_dir = (Path(RAW_DIR) / model_key).resolve()
+    fpath = (model_dir / fname).resolve()
+    if not fpath.is_relative_to(model_dir):
+        raise ValueError("采集文件路径超出当前模型目录")
     task_key = make_task_key(question["id"], model_key, search_enabled, round_num)
-    if task_key in completed_keys:
+    if task_key in completed_keys and fpath.is_file():
         counter["done"] += 1
         return
+    completed_keys.discard(task_key)
 
-    model_dir = os.path.join(RAW_DIR, model_key)
-    max_retries = query_settings.get("retry_max", 3)
+    max_retries = max(1, int(query_settings.get("retry_max", 3)))
     retry_delay = query_settings.get("retry_delay", 5)
 
     for attempt in range(1, max_retries + 1):
         await throttle.acquire()
+        permit_held = True
         try:
             result = await client.query(
                 question=question["question"],
@@ -214,8 +239,6 @@ async def execute_single_query(
             result["timestamp"] = datetime.now().isoformat()
             result["collector_version"] = "query-models-v2-observable"
 
-            fname = result_filename(question["id"], round_num, search_enabled)
-            fpath = os.path.join(model_dir, fname)
             with open(fpath, "w", encoding="utf-8") as f:
                 json.dump(result, f, ensure_ascii=False, indent=2)
 
@@ -237,6 +260,7 @@ async def execute_single_query(
                     save_execution_log(log)
 
             throttle.release()
+            permit_held = False
             throttle.on_success()
 
             search_tag = "联网" if search_enabled else "不联网"
@@ -248,12 +272,14 @@ async def execute_single_query(
             return
 
         except Exception as e:
-            throttle.release()
+            if permit_held:
+                throttle.release()
+                permit_held = False
 
             is_rate_limit, retry_after = _is_rate_limit_error(e)
 
-            if is_rate_limit:
-                # 限流：触发全局降速，然后重试（不计入重试次数）
+            if is_rate_limit and attempt < max_retries:
+                # 限流也受总尝试次数约束，耗尽后统一记录失败。
                 await throttle.on_rate_limit(retry_after)
                 continue
 
@@ -284,6 +310,9 @@ async def execute_single_query(
                 logger.error(
                     f"[{model_key}] {question['id']} 轮{round_num} 最终失败: {e}"
                 )
+        finally:
+            if permit_held:
+                throttle.release()
 
 
 async def query_single_model(
@@ -339,6 +368,11 @@ async def query_single_model(
         save_execution_log(log)
 
     logger.info(f"[{model_key}] 全部完成 ({counter['done']}/{total})")
+    expected = {
+        make_task_key(q["id"], model_key, search, round_num)
+        for q in questions for search in search_modes for round_num in range(1, rounds + 1)
+    }
+    return {"expected": len(expected), "missing": len(expected - completed_keys)}
 
 
 def purge_question(question_id: str, models: list = None):
@@ -427,6 +461,7 @@ async def main(rerun_ids: list = None, rerun_models: list = None):
 
     with open(questions_path, "r", encoding="utf-8") as f:
         questions = json.load(f)
+    validate_questions(questions)
 
     # --rerun 模式：校验ID → 全部通过才清除旧数据 → 只跑指定问题
     if rerun_ids:
@@ -457,6 +492,14 @@ async def main(rerun_ids: list = None, rerun_models: list = None):
 
     lock = asyncio.Lock()
     tasks = []
+
+    if only_models is not None:
+        specs = config.get("models", {})
+        for key in only_models:
+            if key not in specs or not specs[key].get("enabled"):
+                raise ValueError(f"所选模型不可用: {key}")
+            if route != "relay" and (keys.get(key, {}).get("api_key", "") in ("", "sk-xxx")):
+                raise ValueError(f"所选模型未配置 API key: {key}")
 
     for model_key, model_config in config.get("models", {}).items():
         if not model_config.get("enabled", False):
@@ -494,11 +537,10 @@ async def main(rerun_ids: list = None, rerun_models: list = None):
         logger.info(f"[{model_key}] 已加入队列 (联网: {model_config.get('supports_search', False)}, 并发: {concurrency})")
 
     if not tasks:
-        logger.warning("没有可用的模型，请检查 config/models.yaml 和 config/api_keys.yaml")
-        return
+        raise RuntimeError("没有可用的模型，请检查 config/models.yaml 和 config/api_keys.yaml")
 
     logger.info(f"开始执行，{len(tasks)} 个模型并行...")
-    await asyncio.gather(*tasks)
+    summaries = await asyncio.gather(*tasks)
     logger.info("全部执行完成！")
 
     # 按唯一键去重统计（同一任务可能先failed后success，以最终状态为准）
@@ -510,6 +552,10 @@ async def main(rerun_ids: list = None, rerun_models: list = None):
     success = sum(1 for s in final_status.values() if s == "success")
     failed = sum(1 for s in final_status.values() if s == "failed")
     logger.info(f"统计（去重后）: 成功 {success}, 失败 {failed}")
+    expected = sum(item["expected"] for item in summaries)
+    missing = sum(item["missing"] for item in summaries)
+    if not expected or missing:
+        raise RuntimeError(f"采集未完成：预期 {expected} 条，缺少 {missing} 条成功结果；可重试补采")
 
 
 if __name__ == "__main__":

@@ -274,6 +274,7 @@ async def verify_one_response(
             verdicts = _parse_json_response(result["answer"])
         except Exception as e:
             print(f"    校对失败: {e}")
+            counter["failed"] = counter.get("failed", 0) + 1
             return None
 
         total = len(verdicts)
@@ -350,6 +351,8 @@ async def run_verification():
         for resp in responses
     ]
     results = await asyncio.gather(*tasks)
+    if counter.get("failed"):
+        raise RuntimeError(f"准确率校验失败 {counter['failed']} 条，请重试")
     detail_rows = [r for r in results if r is not None]
     if counter["no_kb"]:
         print(f"  跳过 {counter['no_kb']} 条（产品未匹配到知识库）")

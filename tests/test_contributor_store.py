@@ -10,6 +10,9 @@ import tempfile
 import unittest
 from unittest.mock import AsyncMock, patch
 from contextlib import closing
+from concurrent.futures import ThreadPoolExecutor
+import threading
+import time
 
 from backend.app.services import article_review_service, contributor_store
 from backend.app.services.document_extract import extract_article_text
@@ -196,6 +199,116 @@ class ContributorStoreTests(unittest.TestCase):
             settings = contributor_store.update_review_settings({"ai_concurrency": 30}, "admin")
             jobs = article_review_service.claim_jobs("worker", settings["effective_concurrency"])
         self.assertEqual(len(jobs), 5)
+
+
+    def _review_submission(self, session=None):
+        if session is None:
+            session, _, _ = self._workspace(max_submissions=10)
+        result = contributor_store.create_submission(
+            session, "article.txt", b"test body", "p1", "Test title", "Test",
+            "test@example.com", published_platform="site", published_url="https://example.com/old",
+        )
+        return session, result["submission_id"]
+
+    def test_publication_edit_updates_tracking(self):
+        session, sid = self._review_submission()
+        with closing(contributor_store._connect()) as conn:
+            conn.execute("UPDATE article_submission_versions SET content_text='body',content_sha256='hash' WHERE submission_id=?", (sid,))
+            conn.execute("UPDATE article_submissions SET status='awaiting_admin' WHERE submission_id=?", (sid,))
+            conn.commit()
+        contributor_store.review_action(sid, "approve", "admin")
+        with closing(contributor_store._connect()) as conn:
+            article_id = conn.execute("SELECT article_id FROM article_submissions WHERE submission_id=?", (sid,)).fetchone()[0]
+            conn.execute(
+                """INSERT INTO article_publications (publication_id,article_id,platform,url,
+                   canonical_url,url_match_key,created_at) VALUES ('other',?,'other site',
+                   'https://example.com/other','https://example.com/other','example.com/other','2026-09-01')""",
+                (article_id,),
+            )
+            conn.commit()
+        contributor_store.update_publication(session, sid, "new site", "https://example.com/new", "2026-09-15")
+        with closing(contributor_store._connect()) as conn:
+            row = conn.execute("SELECT * FROM article_publications WHERE publication_id<>'other'").fetchone()
+            other = conn.execute("SELECT url FROM article_publications WHERE publication_id='other'").fetchone()[0]
+        self.assertEqual(other, "https://example.com/other")
+        self.assertEqual(row["url"], "https://example.com/new")
+        self.assertEqual(row["url_match_key"], "example.com/new")
+        self.assertEqual(row["platform"], "new site")
+        self.assertEqual(row["published_at"], "2026-09-15")
+
+    def test_concurrent_revisions_preserve_accepted_content(self):
+        session, sid = self._review_submission()
+        with closing(contributor_store._connect()) as conn:
+            conn.execute("UPDATE article_submissions SET status='revision_requested' WHERE submission_id=?", (sid,))
+            conn.commit()
+        barrier = threading.Barrier(2)
+        original_store = contributor_store._store_file
+
+        def slow_write(*args):
+            time.sleep(.1)
+            return original_store(*args)
+
+        def revise(content):
+            barrier.wait(timeout=5)
+            try:
+                return contributor_store.add_revision(session, sid, "v2.txt", content)
+            except ValueError:
+                return None
+
+        with patch.object(contributor_store, "_store_file", side_effect=slow_write), ThreadPoolExecutor(2) as pool:
+            futures = [pool.submit(revise, content) for content in (b"first content", b"second content")]
+            values = [future.result(timeout=15) for future in futures]
+        self.assertEqual(sum(value is not None for value in values), 1)
+        with closing(contributor_store._connect()) as conn:
+            row = conn.execute("SELECT * FROM article_submission_versions WHERE submission_id=? AND version=2", (sid,)).fetchone()
+        content = (contributor_store.SUBMISSION_DIR / row["relative_path"]).read_bytes()
+        self.assertEqual(row["file_sha256"], hashlib.sha256(content).hexdigest())
+        self.assertEqual(contributor_store.get_submission(sid)["current_version"], 2)
+
+    def test_upload_paths_do_not_overwrite_a_previous_attempt(self):
+        first = contributor_store._store_file("company", "submission", 2, "same.txt", b"first")
+        second = contributor_store._store_file("company", "submission", 2, "same.txt", b"second")
+        self.assertNotEqual(first, second)
+        self.assertEqual((contributor_store.SUBMISSION_DIR / first).read_bytes(), b"first")
+
+    def test_stale_review_cannot_complete_or_fail_retried_attempt(self):
+        session, _, _ = self._workspace(max_submissions=10)
+        for fail in (False, True):
+            with self.subTest(fail=fail):
+                _, sid = self._review_submission(session)
+                old_job = article_review_service.claim_jobs("same-worker", 1)[0]
+
+                async def retry_while_waiting(*args):
+                    contributor_store.cancel_review(sid, "admin")
+                    contributor_store.retry_review(sid, "admin")
+                    new_job = article_review_service.claim_jobs("same-worker", 1)[0]
+                    self.assertGreater(new_job["attempts"], old_job["attempts"])
+                    if fail:
+                        raise RuntimeError("stale timeout")
+                    return ({"findings": []}, "raw", "qwen", "test", [])
+
+                with patch.object(article_review_service, "_product_kb", return_value=({"modules": {}}, "hash")), patch.object(article_review_service, "_call_json", side_effect=retry_while_waiting):
+                    asyncio.run(article_review_service.process_job(old_job))
+                item = contributor_store.get_submission(sid)
+                self.assertEqual(item["review_job_status"], "running")
+                self.assertEqual(item["status"], "reviewing")
+                self.assertIsNone(item["review_error"])
+                self.assertIsNone(item["report"])
+
+    def test_cancel_during_parse_cannot_restore_submission_state(self):
+        _, sid = self._review_submission()
+        job = article_review_service.claim_jobs("worker", 1)[0]
+
+        def cancelled_parse(*args):
+            contributor_store.cancel_review(sid, "admin")
+            raise ValueError("bad document after cancellation")
+
+        with patch.object(article_review_service, "extract_article_text", side_effect=cancelled_parse):
+            asyncio.run(article_review_service.process_job(job))
+        item = contributor_store.get_submission(sid)
+        self.assertEqual(item["review_job_status"], "cancelled")
+        self.assertEqual(item["status"], "review_failed")
+        self.assertIsNone(item["admin_feedback"])
 
 
 class ReviewHelpersTests(unittest.TestCase):

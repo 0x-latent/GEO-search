@@ -16,6 +16,7 @@ from uuid import uuid4
 from ..core.paths import CONFIG_DIR, DATA_DIR, ROOT_DIR, SCRIPTS_DIR
 from .user_config_store import GLOBAL_KB_PATH, user_brands_path, user_kb_path
 from .yaml_store import load_models
+from utils.question_validation import validate_questions
 
 JOBS_DB_PATH = DATA_DIR / "jobs.sqlite"
 JOBS_DIR = DATA_DIR / "jobs"
@@ -31,9 +32,9 @@ _CANCEL_FLAGS: set[str] = set()
 # 流水线阶段：(阶段名, 脚本, 失败是否中止整个 job)
 STAGES = [
     ("collect", "03_query_models.py", True),
-    ("analyze", "04_analyze_results.py", False),
-    ("extract", "05_extract_recommendations.py", False),
-    ("verify", "07_verify_accuracy.py", False),
+    ("analyze", "04_analyze_results.py", True),
+    ("extract", "05_extract_recommendations.py", True),
+    ("verify", "07_verify_accuracy.py", True),
 ]
 
 _QUEUE: "queue.Queue[str]" = queue.Queue()
@@ -213,12 +214,16 @@ def create_job(
     concurrency: int | None = None,
     model_concurrency: dict[str, int] | None = None,
 ) -> dict[str, Any]:
-    if not questions:
-        raise ValueError("问题列表为空")
+    validate_questions(questions)
     if len(questions) > MAX_QUESTIONS:
         raise ValueError(f"单次最多 {MAX_QUESTIONS} 个问题，当前 {len(questions)} 个")
     if not models:
         raise ValueError("至少选择一个模型")
+    specs = load_models().get("models") or {}
+    if len(set(models)) != len(models) or any(
+        key not in specs or not specs[key].get("enabled") for key in models
+    ):
+        raise ValueError("模型列表包含重复、未知或未启用的模型")
     if search_mode not in ("both", "search", "nosearch"):
         raise ValueError("search_mode 必须是 both / search / nosearch")
     rounds = max(1, min(int(rounds), 5))

@@ -27,20 +27,9 @@ def _user_dir(username: str) -> Path:
     return USER_CONFIGS_DIR / key
 
 
-def _legacy_user_dir(username: str) -> Path:
-    """旧版目录键，仅用于读取/清理历史配置。新写入一律使用哈希键。"""
-    safe = "".join(c for c in username.strip() if c.isalnum() or c in "-_")
-    if not safe:
-        raise ValueError("非法用户名")
-    return USER_CONFIGS_DIR / safe
-
-
 def _user_config_path(username: str, filename: str) -> Path:
-    current = _user_dir(username) / filename
-    if current.exists():
-        return current
-    legacy = _legacy_user_dir(username) / filename
-    return legacy if legacy.exists() else current
+    # 旧目录名有碰撞，不能仅凭用户名推断归属；须经管理员核实后迁移。
+    return _user_dir(username) / filename
 
 
 def user_brands_path(username: str) -> Path | None:
@@ -94,7 +83,6 @@ def save_user_kb(username: str, data: dict[str, Any]) -> None:
 def reset_user_brands(username: str) -> None:
     paths = {
         _user_dir(username) / "brands.yaml",
-        _legacy_user_dir(username) / "brands.yaml",
     }
     for path in paths:
         if path.exists():
@@ -104,7 +92,6 @@ def reset_user_brands(username: str) -> None:
 def reset_user_kb(username: str) -> None:
     paths = {
         _user_dir(username) / "knowledge_base.json",
-        _legacy_user_dir(username) / "knowledge_base.json",
     }
     for path in paths:
         if path.exists():

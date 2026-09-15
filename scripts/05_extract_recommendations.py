@@ -74,8 +74,13 @@ def load_extract_log() -> dict:
     """加载提取日志（已完成的任务集合）"""
     if os.path.exists(EXTRACT_LOG_PATH):
         with open(EXTRACT_LOG_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {"completed": {}}
+            log = json.load(f)
+        if log.get("version", 1) < 2:
+            # 旧版空缓存可能由失败产生；仅重做无法区分的空条目。
+            log["completed"] = {key: value for key, value in log.get("completed", {}).items() if value}
+        log["version"] = 2
+        return log
+    return {"version": 2, "completed": {}}
 
 
 def save_extract_log(log: dict):
@@ -166,14 +171,20 @@ async def extract_one(client, resp: dict, semaphore: asyncio.Semaphore,
                 )
                 raw_json = _parse_json_response(result["answer"])
                 recs = raw_json if isinstance(raw_json, list) else raw_json.get("results", raw_json.get("data", []))
+                if not isinstance(recs, list) or any(not isinstance(item, dict) for item in recs):
+                    raise ValueError("推荐抽取结果必须是对象数组")
                 break
             except Exception as e:
                 last_error = e
+                recs = None
         if recs is None:
             counter["fail"] += 1
             if counter["fail"] <= 5:
                 print(f"  提取失败: {last_error}")
             recs = []
+            # 失败不能进入成功断点集合；重跑时必须重新调用。
+            counter["done"] += 1
+            return resp, recs
 
         # 记录到日志
         async with lock:
@@ -235,6 +246,9 @@ async def main():
 
     # 最终保存日志
     save_extract_log(log)
+
+    if counter["fail"]:
+        raise RuntimeError(f"推荐抽取失败 {counter['fail']} 条；成功结果已保存，可重试补齐")
 
     # 整理结果
     detail_rows = []

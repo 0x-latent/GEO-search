@@ -288,7 +288,7 @@ def delete_contributor_session(token: str | None) -> None:
 
 def _store_file(company_id: str, submission_id: str, version: int, filename: str, content: bytes) -> str:
     safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", Path(filename).name)[:120] or "article"
-    relative = Path(company_id) / submission_id / f"v{version:03d}" / safe_name
+    relative = Path(company_id) / submission_id / f"v{version:03d}" / uuid4().hex / safe_name
     target = SUBMISSION_DIR / relative
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(content)
@@ -372,17 +372,16 @@ def create_submission(
 def add_revision(session: dict[str, Any], submission_id: str, filename: str, content: bytes) -> dict[str, Any]:
     ext = validate_document(filename, content)
     with closing(_connect()) as conn:
+        # 版本分配与状态检查共用写事务；并发请求不能预先占用同一版本。
+        conn.execute("BEGIN IMMEDIATE")
         row = conn.execute("SELECT * FROM article_submissions WHERE submission_id=? AND company_id=?", (submission_id, session["company_id"])).fetchone()
         if not row:
             raise ValueError("投稿不存在")
         if row["status"] not in {"revision_requested", "review_failed", "blocked_missing_kb"}:
             raise ValueError("当前状态不能上传修订版")
         version = row["current_version"] + 1
-    relative = _store_file(session["company_id"], submission_id, version, filename, content)
-    now = _iso()
-    with closing(_connect()) as conn:
-        conn.execute("BEGIN IMMEDIATE")
-        row = conn.execute("SELECT * FROM article_submissions WHERE submission_id=? AND company_id=?", (submission_id, session["company_id"])).fetchone()
+        relative = _store_file(session["company_id"], submission_id, version, filename, content)
+        now = _iso()
         old_status = row["status"]
         conn.execute(
             """INSERT INTO article_submission_versions
@@ -406,6 +405,7 @@ def update_publication(
         raise ValueError("请填写发布平台")
     canonical, _ = url_match_key(url.strip())
     with closing(_connect()) as conn:
+        conn.execute("BEGIN IMMEDIATE")
         row = conn.execute("SELECT * FROM article_submissions WHERE submission_id=? AND company_id=?", (submission_id, session["company_id"])).fetchone()
         if not row:
             raise ValueError("投稿不存在")
@@ -413,6 +413,24 @@ def update_publication(
             "UPDATE article_submissions SET published_platform=?,published_url=?,published_at=?,updated_at=? WHERE submission_id=?",
             (platform, canonical, published_at, _iso(), submission_id),
         )
+        if row["article_id"]:
+            _, match_key = url_match_key(canonical)
+            _, previous_key = url_match_key(row["published_url"])
+            publication = conn.execute(
+                "SELECT publication_id FROM article_publications WHERE article_id=? AND url_match_key=?",
+                (row["article_id"], previous_key),
+            ).fetchone()
+            if publication is None:
+                raise ValueError("关联的发布记录不存在，请联系管理员核对")
+            conn.execute(
+                """UPDATE article_publications SET platform=?,url=?,canonical_url=?,
+                   url_match_key=?,published_at=? WHERE publication_id=?""",
+                (platform, canonical, canonical, match_key, published_at, publication["publication_id"]),
+            )
+            conn.execute(
+                "DELETE FROM source_article_matches WHERE publication_id=?",
+                (publication["publication_id"],),
+            )
         _event(conn, submission_id, "contributor", None, "publication_updated", row["status"], row["status"])
         conn.commit()
     if row["status"] == "approved_waiting_publication":
