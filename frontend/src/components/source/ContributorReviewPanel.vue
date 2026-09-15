@@ -2,6 +2,8 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { api, apiJson } from "@/api/client";
+import { useRouter } from "vue-router";
+const router = useRouter();
 
 const submissions = ref([]);
 const companies = ref([]);
@@ -33,6 +35,7 @@ async function load() {
 }
 
 async function open(row) {
+  if (row.project_id) return router.push({ path: '/projects', query: { project: row.project_id } });
   detail.value = await api(`/api/admin/article-submissions/${row.submission_id}`);
   feedback.value = ""; selectedFindings.value = [];
 }

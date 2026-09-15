@@ -25,7 +25,7 @@ EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 ALLOWED_STATUS = {
     "queued", "reviewing", "awaiting_admin", "revision_requested",
     "approved_waiting_publication", "rejected", "tracked",
-    "review_failed", "blocked_missing_kb",
+    "review_failed", "blocked_missing_kb", "publication_pending", "publication_accepted",
 }
 
 
@@ -145,7 +145,7 @@ def update_company(company_id: str, **values: Any) -> dict[str, Any]:
 
 def create_invite(
     company_id: str, created_by: str, allowed_product_codes: list[str],
-    expires_at: str, max_submissions: int = 20,
+    expires_at: str, max_submissions: int = 20, project_id: str | None = None,
 ) -> dict[str, Any]:
     company = get_company(company_id)
     if not company["is_active"]:
@@ -162,6 +162,16 @@ def create_invite(
     token = secrets.token_urlsafe(32)
     invite_id = f"inv_{uuid4().hex}"
     with closing(_connect()) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        if project_id:
+            from . import project_store
+            project = project_store.get_project(project_id, conn)
+            project_store.active(project)
+            if company_id not in project["company_ids"]:
+                raise ValueError("公司未获项目授权")
+            requested = requested or project["product_codes"]
+            if not set(requested) <= set(project["product_codes"]):
+                raise ValueError("邀请产品超出项目范围")
         conn.execute(
             """INSERT INTO contributor_invites
             (invite_id,company_id,token_hash,allowed_product_codes_json,expires_at,
@@ -170,8 +180,9 @@ def create_invite(
             (invite_id, company_id, _hash_token(token), _json(requested),
              _iso(expires), max_submissions, created_by, _iso()),
         )
+        conn.execute("UPDATE contributor_invites SET project_id=? WHERE invite_id=?", (project_id, invite_id))
         conn.commit()
-    return {"invite_id": invite_id, "token": token, "company_id": company_id,
+    return {"invite_id": invite_id, "token": token, "company_id": company_id, "project_id": project_id,
             "company_name": company["name"], "expires_at": _iso(expires),
             "max_submissions": max_submissions, "allowed_product_codes": requested}
 
@@ -185,7 +196,7 @@ def list_invites(company_id: str | None = None) -> list[dict[str, Any]]:
         rows = conn.execute(
             f"""SELECT i.invite_id,i.company_id,c.name company_name,
             i.allowed_product_codes_json,i.expires_at,i.max_submissions,
-            i.submission_count,i.revoked_at,i.created_by,i.created_at,i.last_used_at
+            i.submission_count,i.revoked_at,i.created_by,i.created_at,i.last_used_at,i.project_id
             FROM contributor_invites i JOIN contributor_companies c USING(company_id)
             {where} ORDER BY i.created_at DESC""", params,
         ).fetchall()
@@ -224,8 +235,9 @@ def exchange_invite(invite_id: str, token: str) -> tuple[str, dict[str, Any], in
         expires = _parse_time(row["expires_at"])
         if expires <= _now_dt():
             raise ValueError("邀请已过期")
-        if row["submission_count"] >= row["max_submissions"]:
-            raise ValueError("邀请投稿次数已用完")
+        # Quota only limits new submissions, not return visits and publication.
+        from .project_store import validate_invite
+        validate_invite(conn, dict(row))
         session = secrets.token_urlsafe(32)
         session_expiry = min(expires, _now_dt() + timedelta(seconds=SESSION_TTL_SECONDS))
         conn.execute(
@@ -239,6 +251,7 @@ def exchange_invite(invite_id: str, token: str) -> tuple[str, dict[str, Any], in
 
 
 def _workspace(invite: dict[str, Any]) -> dict[str, Any]:
+    from .project_store import workspace_project
     allowed = _loads(invite.get("allowed_product_codes_json"), [])
     products = list_products()
     if allowed:
@@ -248,6 +261,7 @@ def _workspace(invite: dict[str, Any]) -> dict[str, Any]:
         "company_name": invite.get("company_name"), "expires_at": invite["expires_at"],
         "remaining_submissions": max(0, invite["max_submissions"] - invite["submission_count"]),
         "products": products,
+        "project": workspace_project(invite["project_id"]) if invite.get("project_id") else None,
     }
 
 
@@ -312,6 +326,7 @@ def create_submission(
     title: str, submitter_name: str, submitter_email: str,
     campaign: str | None = None, published_platform: str | None = None,
     published_url: str | None = None, published_at: str | None = None,
+    planned_platform: str | None = None, planned_at: str | None = None,
 ) -> dict[str, Any]:
     ext = validate_document(filename, content)
     title, submitter_name, submitter_email = title.strip(), submitter_name.strip(), submitter_email.strip()
@@ -331,6 +346,10 @@ def create_submission(
         raise ValueError("发布平台和发布链接需要同时填写")
     if url:
         url, _ = url_match_key(url)
+    if session.get("project_id") and url:
+        raise ValueError("项目稿件须先审批，获准发布后再回填链接")
+    if planned_at:
+        _parse_time(planned_at)
     with closing(_connect()) as conn:
         invite_check = conn.execute(
             "SELECT revoked_at,submission_count,max_submissions FROM contributor_invites WHERE invite_id=?",
@@ -344,6 +363,14 @@ def create_submission(
     now = _iso()
     with closing(_connect()) as conn:
         conn.execute("BEGIN IMMEDIATE")
+        from . import project_store
+        project_store.validate_invite(conn, session, new_submission=True)
+        if session.get("project_id"):
+            project = project_store.get_project(session["project_id"], conn)
+            if product_code not in project["product_codes"]:
+                raise ValueError("产品不在项目范围")
+            if project["channels"] and planned_platform not in project["channels"]:
+                raise ValueError("请选择项目约定的发布渠道")
         invite = conn.execute("SELECT * FROM contributor_invites WHERE invite_id=?", (session["invite_id"],)).fetchone()
         if not invite or invite["revoked_at"] or invite["submission_count"] >= invite["max_submissions"]:
             raise ValueError("邀请投稿次数已用完或邀请已撤销")
@@ -362,11 +389,13 @@ def create_submission(
             VALUES (?,1,?,?,?,?,?,?)""",
             (submission_id, filename, ext, hashlib.sha256(content).hexdigest(), len(content), relative, now),
         )
+        conn.execute("UPDATE article_submissions SET project_id=?,planned_platform=?,planned_at=? WHERE submission_id=?",
+                     (session.get("project_id"), planned_platform, planned_at, submission_id))
         job_id = _queue_job(conn, submission_id, 1)
         conn.execute("UPDATE contributor_invites SET submission_count=submission_count+1 WHERE invite_id=?", (session["invite_id"],))
         _event(conn, submission_id, "contributor", submitter_email, "submitted", None, "queued", {"job_id": job_id})
         conn.commit()
-    return get_submission(submission_id, company_id=session["company_id"], external=True)
+    return get_submission(submission_id, company_id=session["company_id"], external=True, project_id=session.get("project_id"))
 
 
 def add_revision(session: dict[str, Any], submission_id: str, filename: str, content: bytes) -> dict[str, Any]:
@@ -375,9 +404,13 @@ def add_revision(session: dict[str, Any], submission_id: str, filename: str, con
         # 版本分配与状态检查共用写事务；并发请求不能预先占用同一版本。
         conn.execute("BEGIN IMMEDIATE")
         row = conn.execute("SELECT * FROM article_submissions WHERE submission_id=? AND company_id=?", (submission_id, session["company_id"])).fetchone()
-        if not row:
-            raise ValueError("投稿不存在")
-        if row["status"] not in {"revision_requested", "review_failed", "blocked_missing_kb"}:
+        from . import project_store
+        project_store.validate_invite(conn, session)
+        project_store.check_submission_scope(row, session)
+        allowed_states = {"revision_requested", "review_failed", "blocked_missing_kb"}
+        if row["project_id"]:
+            allowed_states |= {"approved_waiting_publication", "publication_pending"}
+        if row["status"] not in allowed_states:
             raise ValueError("当前状态不能上传修订版")
         version = row["current_version"] + 1
         relative = _store_file(session["company_id"], submission_id, version, filename, content)
@@ -390,25 +423,46 @@ def add_revision(session: dict[str, Any], submission_id: str, filename: str, con
             (submission_id, version, filename, ext, hashlib.sha256(content).hexdigest(), len(content), relative, now),
         )
         conn.execute("UPDATE article_submissions SET current_version=?,status='queued',admin_feedback=NULL,updated_at=? WHERE submission_id=?", (version, now, submission_id))
+        conn.execute("""UPDATE article_submissions SET approval_step=0,approved_version=NULL,approved_by=NULL,
+            approved_at=NULL,rejected_by=NULL,rejected_at=NULL WHERE submission_id=?""", (submission_id,))
+        if row["project_id"]:
+            conn.execute("""UPDATE article_submissions SET published_platform=NULL,published_url=NULL,
+                published_at=NULL,publication_evidence=NULL,publication_revision=publication_revision+1
+                WHERE submission_id=?""", (submission_id,))
         job_id = _queue_job(conn, submission_id, version)
         _event(conn, submission_id, "contributor", None, "revision_uploaded", old_status, "queued", {"version": version, "job_id": job_id})
         conn.commit()
-    return get_submission(submission_id, company_id=session["company_id"], external=True)
+    return get_submission(submission_id, company_id=session["company_id"], external=True, project_id=session.get("project_id"))
 
 
 def update_publication(
     session: dict[str, Any], submission_id: str, platform: str, url: str,
-    published_at: str | None = None,
+    published_at: str | None = None, evidence: str | None = None, expected_version: int | None = None,
 ) -> dict[str, Any]:
     platform = platform.strip()
     if not platform:
         raise ValueError("请填写发布平台")
     canonical, _ = url_match_key(url.strip())
+    if published_at:
+        if _parse_time(published_at) > _now_dt():
+            raise ValueError("实际发布时间不能在未来")
     with closing(_connect()) as conn:
         conn.execute("BEGIN IMMEDIATE")
         row = conn.execute("SELECT * FROM article_submissions WHERE submission_id=? AND company_id=?", (submission_id, session["company_id"])).fetchone()
-        if not row:
-            raise ValueError("投稿不存在")
+        from . import project_store
+        project_store.validate_invite(conn, session)
+        project_store.check_submission_scope(row, session)
+        if row["project_id"]:
+            if (row["status"] != "approved_waiting_publication" or expected_version != row["current_version"]
+                    or row["approved_version"] != row["current_version"]):
+                raise ValueError("仅当前获批版本可回填发布信息，请刷新状态")
+            p = project_store.get_project(row["project_id"], conn)
+            if p["channels"] and platform not in p["channels"]:
+                raise ValueError("发布渠道不在项目范围")
+            if not published_at or not (evidence or "").strip():
+                raise ValueError("请填写实际发布时间和发布凭证说明")
+            conn.execute("""UPDATE article_submissions SET status='publication_pending',publication_evidence=?,
+                publication_revision=publication_revision+1 WHERE submission_id=?""", (evidence, submission_id))
         conn.execute(
             "UPDATE article_submissions SET published_platform=?,published_url=?,published_at=?,updated_at=? WHERE submission_id=?",
             (platform, canonical, published_at, _iso(), submission_id),
@@ -431,19 +485,23 @@ def update_publication(
                 "DELETE FROM source_article_matches WHERE publication_id=?",
                 (publication["publication_id"],),
             )
-        _event(conn, submission_id, "contributor", None, "publication_updated", row["status"], row["status"])
+        _event(conn, submission_id, "contributor", None, "publication_updated", row["status"],
+               "publication_pending" if row["project_id"] else row["status"],
+               {"url": canonical, "platform": platform, "published_at": published_at, "evidence": evidence})
         conn.commit()
-    if row["status"] == "approved_waiting_publication":
+    if row["status"] == "approved_waiting_publication" and not row["project_id"]:
         promote_submission(submission_id, row["approved_by"] or "admin")
-    return get_submission(submission_id, company_id=session["company_id"], external=True)
+    return get_submission(submission_id, company_id=session["company_id"], external=True, project_id=session.get("project_id"))
 
 
-def list_submissions(company_id: str | None = None, status: str | None = None, *, external: bool = False) -> list[dict[str, Any]]:
+def list_submissions(company_id: str | None = None, status: str | None = None, *, external: bool = False, project_id: str | None = None) -> list[dict[str, Any]]:
     clauses, params = [], []
     if company_id:
         clauses.append("s.company_id=?"); params.append(company_id)
     if status:
         clauses.append("s.status=?"); params.append(status)
+    if external or project_id is not None:
+        clauses.append("s.project_id IS ?"); params.append(project_id)
     where = "WHERE " + " AND ".join(clauses) if clauses else ""
     with closing(_connect()) as conn:
         rows = conn.execute(
@@ -464,13 +522,30 @@ def _submission_public(item: dict[str, Any], external: bool) -> dict[str, Any]:
             version.pop("parse_error", None)
         for event in item.get("events", []):
             event.pop("details_json", None)
+        for finding in item.get("findings", []):
+            finding.pop("reviewer_note", None)
     return item
 
 
-def get_submission(submission_id: str, company_id: str | None = None, *, external: bool = False) -> dict[str, Any]:
+def submission_file(submission_id):
+    with closing(_connect()) as conn:
+        row = conn.execute("""SELECT v.relative_path,v.original_filename FROM article_submissions s
+            JOIN article_submission_versions v ON v.submission_id=s.submission_id AND v.version=s.current_version
+            WHERE s.submission_id=?""", (submission_id,)).fetchone()
+    if not row:
+        raise ValueError("稿件文件不存在")
+    path = (SUBMISSION_DIR / row['relative_path']).resolve()
+    if not path.is_relative_to(SUBMISSION_DIR.resolve()) or not path.is_file():
+        raise ValueError("稿件文件不可用")
+    return path, row['original_filename']
+
+
+def get_submission(submission_id: str, company_id: str | None = None, *, external: bool = False, project_id: str | None = None) -> dict[str, Any]:
     clauses, params = ["s.submission_id=?"], [submission_id]
     if company_id:
         clauses.append("s.company_id=?"); params.append(company_id)
+    if external:
+        clauses.append("s.project_id IS ?"); params.append(project_id)
     with closing(_connect()) as conn:
         row = conn.execute(
             f"""SELECT s.*,c.name company_name,j.job_id,j.status review_job_status,
@@ -484,6 +559,15 @@ def get_submission(submission_id: str, company_id: str | None = None, *, externa
         if not row:
             raise ValueError("投稿不存在")
         result = dict(row)
+        if not external and result["project_id"]:
+            from .project_store import get_project
+            result["approval_steps"] = get_project(result["project_id"], conn)["approval_steps"]
+            result["decisions"] = [dict(r) for r in conn.execute(
+                "SELECT * FROM article_approval_decisions WHERE submission_id=? ORDER BY version,step", (submission_id,))]
+            result["report_history"] = [dict(r) for r in conn.execute(
+                """SELECT j.version,r.summary,r.knowledge_base_sha256,r.knowledge_snapshot_json,r.created_at
+                FROM article_review_reports r JOIN article_review_jobs j USING(job_id)
+                WHERE j.submission_id=? ORDER BY j.version DESC""", (submission_id,))]
         result["versions"] = [dict(r) for r in conn.execute(
             """SELECT version,original_filename,file_ext,file_sha256,size_bytes,content_sha256,
             parse_error,created_at FROM article_submission_versions WHERE submission_id=? ORDER BY version DESC""",
@@ -536,6 +620,8 @@ def review_action(
         row = conn.execute("SELECT * FROM article_submissions WHERE submission_id=?", (submission_id,)).fetchone()
         if not row:
             raise ValueError("投稿不存在")
+        if row["project_id"]:
+            raise ValueError("请在项目工作台由指定审批人逐级审批")
         if row["status"] != "awaiting_admin":
             raise ValueError("仅待管理员确认的投稿可以执行此操作")
         if action == "approve":
@@ -572,6 +658,10 @@ def promote_submission(submission_id: str, approved_by: str) -> str:
             raise ValueError("投稿缺少发布链接或可解析正文")
         if row["article_id"]:
             return row["article_id"]
+        if row["project_id"] and (row["status"] != "publication_accepted" or row["approved_version"] != row["current_version"]):
+            raise ValueError("项目稿件尚未完成当前版本的发布验收")
+        if not row["project_id"] and row["status"] != "approved_waiting_publication":
+            raise ValueError("稿件尚未获准发布")
         canonical, match_key = url_match_key(row["published_url"])
         article_id, publication_id, now = f"art_{uuid4().hex}", f"pub_{uuid4().hex}", _iso()
         conn.execute("""INSERT INTO outbound_articles

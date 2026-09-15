@@ -523,8 +523,57 @@ CREATE INDEX IF NOT EXISTS idx_metrics_scenario_lookup
     ON metrics_scenario(dataset_id, product_code, scenario);
 """
 
+PROJECT_SCHEMA = """
+CREATE TABLE IF NOT EXISTS geo_projects (
+    project_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    owner_username TEXT NOT NULL,
+    brief TEXT NOT NULL,
+    product_codes_json TEXT NOT NULL,
+    company_ids_json TEXT NOT NULL,
+    approval_steps_json TEXT NOT NULL,
+    channels_json TEXT NOT NULL,
+    target_questions TEXT NOT NULL DEFAULT '',
+    kb_products_json TEXT NOT NULL DEFAULT '{}',
+    submission_deadline TEXT,
+    monitor_interval_hours INTEGER NOT NULL DEFAULT 24,
+    monitor_until TEXT,
+    next_monitor_at TEXT,
+    last_monitor_at TEXT,
+    monitor_error TEXT,
+    status TEXT NOT NULL DEFAULT 'active',
+    review_notes TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS geo_project_events (
+    event_id TEXT PRIMARY KEY, project_id TEXT NOT NULL, actor TEXT NOT NULL,
+    action TEXT NOT NULL, details_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL,
+    FOREIGN KEY (project_id) REFERENCES geo_projects(project_id)
+);
+CREATE TABLE IF NOT EXISTS article_approval_decisions (
+    decision_id TEXT PRIMARY KEY, submission_id TEXT NOT NULL, version INTEGER NOT NULL,
+    step INTEGER NOT NULL, reviewer TEXT NOT NULL, action TEXT NOT NULL,
+    feedback TEXT NOT NULL, created_at TEXT NOT NULL,
+    UNIQUE(submission_id, version, step),
+    FOREIGN KEY (submission_id, version) REFERENCES article_submission_versions(submission_id, version)
+);
+CREATE TABLE IF NOT EXISTS geo_project_monitor_snapshots (
+    snapshot_id TEXT PRIMARY KEY, project_id TEXT NOT NULL, captured_at TEXT NOT NULL,
+    result_json TEXT NOT NULL,
+    FOREIGN KEY (project_id) REFERENCES geo_projects(project_id)
+);
+"""
+
 # 已有库的惰性加列（CREATE TABLE IF NOT EXISTS 对已存在的表不生效）
 _LAZY_COLUMNS: dict[str, dict[str, str]] = {
+    "contributor_invites": {"project_id": "TEXT"},
+    "article_submissions": {
+        "project_id": "TEXT", "approval_step": "INTEGER NOT NULL DEFAULT 0",
+        "approved_version": "INTEGER", "publication_revision": "INTEGER NOT NULL DEFAULT 0",
+        "publication_evidence": "TEXT", "planned_platform": "TEXT", "planned_at": "TEXT",
+    },
+    "article_review_reports": {"knowledge_snapshot_json": "TEXT NOT NULL DEFAULT '{}'"},
     "datasets": {
         "owner_username": "TEXT",
         "product_code": "TEXT",
@@ -569,6 +618,7 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
     """建齐所有表并补齐新列，幂等，可在每次连接/启动时调用。"""
     conn.executescript(SCHEMA)
     conn.executescript(EXTENSION_SCHEMA)
+    conn.executescript(PROJECT_SCHEMA)
     for table, columns in _LAZY_COLUMNS.items():
         _ensure_columns(conn, table, columns)
     conn.execute(
@@ -579,6 +629,9 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
         "CREATE INDEX IF NOT EXISTS idx_outbound_articles_submission "
         "ON outbound_articles(submission_id)"
     )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_submissions_project ON article_submissions(project_id,status)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_invites_project ON contributor_invites(project_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_project_snapshots ON geo_project_monitor_snapshots(project_id,captured_at)")
     conn.commit()
 
 

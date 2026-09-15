@@ -4,6 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, Response, UploadFile
 from pydantic import BaseModel, Field
+from fastapi.responses import FileResponse
 
 from ..services import contributor_store
 from ..services.document_extract import MAX_FILE_BYTES
@@ -36,6 +37,8 @@ class PublicationPayload(BaseModel):
     platform: str
     url: str
     published_at: str | None = None
+    evidence: str | None = Field(default=None, max_length=5000)
+    expected_version: int | None = None
 
 
 @router.post("/api/contributor/session")
@@ -68,7 +71,7 @@ def contributor_logout(request: Request, response: Response) -> dict[str, str]:
 @router.get("/api/contributor/submissions")
 def contributor_submissions(request: Request) -> list[dict[str, Any]]:
     session = _contributor(request)
-    return contributor_store.list_submissions(session["company_id"], external=True)
+    return contributor_store.list_submissions(session["company_id"], external=True, project_id=session.get("project_id"))
 
 
 @router.post("/api/contributor/submissions")
@@ -83,13 +86,15 @@ async def create_submission(
     published_platform: str | None = Form(None),
     published_url: str | None = Form(None),
     published_at: str | None = Form(None),
+    planned_platform: str | None = Form(None),
+    planned_at: str | None = Form(None),
 ) -> dict[str, Any]:
     session = _contributor(request)
     try:
         return contributor_store.create_submission(
             session, file.filename or "article", await file.read(MAX_FILE_BYTES + 1), product_code,
             title, submitter_name, submitter_email, campaign,
-            published_platform, published_url, published_at,
+            published_platform, published_url, published_at, planned_platform, planned_at,
         )
     except ValueError as exc:
         raise _failure(exc) from exc
@@ -100,7 +105,7 @@ def contributor_submission(submission_id: str, request: Request) -> dict[str, An
     session = _contributor(request)
     try:
         return contributor_store.get_submission(
-            submission_id, company_id=session["company_id"], external=True
+            submission_id, company_id=session["company_id"], external=True, project_id=session.get("project_id")
         )
     except ValueError as exc:
         raise _failure(exc, 404) from exc
@@ -126,7 +131,7 @@ def contributor_publication(
     try:
         return contributor_store.update_publication(
             _contributor(request), submission_id, payload.platform,
-            payload.url, payload.published_at,
+            payload.url, payload.published_at, payload.evidence, payload.expected_version,
         )
     except ValueError as exc:
         raise _failure(exc) from exc
@@ -136,6 +141,17 @@ class CompanyPayload(BaseModel):
     name: str
     contact_name: str | None = None
     contact_email: str | None = None
+
+
+@router.get('/api/contributor/submissions/{submission_id}/file')
+def download_submission(submission_id: str, request: Request):
+    session = _contributor(request)
+    try:
+        contributor_store.get_submission(submission_id, session['company_id'], external=True, project_id=session.get('project_id'))
+        path, filename = contributor_store.submission_file(submission_id)
+    except ValueError as exc:
+        raise _failure(exc, 404) from exc
+    return FileResponse(path, filename=filename, media_type='application/octet-stream')
 
 
 class CompanyPatch(BaseModel):

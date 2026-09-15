@@ -13,6 +13,8 @@ services:
       # portal SSO 共享密钥：必须由网关请求携带，未配置时 compose 直接失败。
       GEO_PORTAL_SECRET: ${GEO_PORTAL_SECRET:?GEO_PORTAL_SECRET must be set}
       GEO_PORTAL_LOGIN_URL: ${GEO_PORTAL_LOGIN_URL:-/portal/login}
+      GEO_KB_URL: ${GEO_KB_URL:-}
+      GEO_KB_KEY: ${GEO_KB_KEY:-}
       GEO_ARTICLE_REVIEW_CONCURRENCY_MAX: ${GEO_ARTICLE_REVIEW_CONCURRENCY_MAX:-5}
     volumes:
       - ./config/api_keys.yaml:/app/config/api_keys.yaml:ro
@@ -39,6 +41,8 @@ services:
     environment:
       LANG: C.UTF-8
       LC_ALL: C.UTF-8
+      GEO_KB_URL: ${GEO_KB_URL:-}
+      GEO_KB_KEY: ${GEO_KB_KEY:-}
       GEO_ARTICLE_REVIEW_CONCURRENCY_MAX: ${GEO_ARTICLE_REVIEW_CONCURRENCY_MAX:-5}
     volumes:
       - ./config/api_keys.yaml:/app/config/api_keys.yaml:ro

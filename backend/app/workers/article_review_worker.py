@@ -6,7 +6,7 @@ import os
 import signal
 from uuid import uuid4
 
-from ..services import article_review_service, contributor_store, product_master
+from ..services import article_review_service, contributor_store, product_master, project_store
 
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
@@ -35,6 +35,10 @@ async def run() -> None:
                 task = asyncio.create_task(article_review_service.process_job(job))
                 running.add(task)
         article_review_service.update_worker_heartbeat(worker_id, len(running))
+        try:
+            await asyncio.to_thread(project_store.monitor_tick)
+        except Exception:
+            logger.exception("project monitor tick failed")
         try:
             await asyncio.wait_for(stop.wait(), timeout=5)
         except asyncio.TimeoutError:

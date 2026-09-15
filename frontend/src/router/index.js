@@ -7,6 +7,7 @@ import { useSessionStore } from "@/stores/session";
 const router = createRouter({
   history: createWebHashHistory(),
   routes: [
+    { path: "/projects", name: "projects", component: () => import("@/views/Projects.vue"), meta: { title: "项目协作" } },
     { path: "/", redirect: "/overview" },
     {
       path: "/overview",

@@ -14,6 +14,7 @@ const navItems = computed(() => {
   const items = [
     { key: "/overview", label: "品牌总览", iconName: "chart" },
     { key: "/sources", label: "信源分析", iconName: "link" },
+    { key: "/projects", label: "项目协作", iconName: "briefcase" },
     { key: "/analysis", label: "我的分析", iconName: "flask" },
     { key: "/settings", label: "我的配置", iconName: "settings" },
   ];

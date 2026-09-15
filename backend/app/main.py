@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from .api.auth_routes import router as auth_router
 from .api.config_routes import router as config_router
 from .api.contributor_routes import router as contributor_router
+from .api.project_routes import router as project_router
 from .api.insight_routes import products_router, router as insight_router
 from .api.investigation_routes import router as investigation_router
 from .api.job_routes import router as job_router, template_router
@@ -93,6 +94,7 @@ async def auth_middleware(request: Request, call_next):
 app.include_router(auth_router)
 app.include_router(config_router)
 app.include_router(contributor_router)
+app.include_router(project_router)
 app.include_router(insight_router)
 app.include_router(investigation_router)
 app.include_router(products_router)
